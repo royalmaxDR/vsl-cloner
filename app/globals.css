@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #F8FAFC; /* Slate 50 */
+  --color-card: #FFFFFF;
+  --color-card-border: #E2E8F0; /* Slate 200 */
+  --color-primary: #2563EB; /* Blue 600 */
+  --color-primary-hover: #1D4ED8; /* Blue 700 */
+  --color-warning: #F59E0B;
+  --color-accent: #4F46E5; /* Indigo 600 */
+  --color-dollar: #3B82F6;
+  --color-euro: #EC4899;
+}
+
+body {
+  background-color: var(--color-background);
+  color: #0F172A; /* Slate 900 */
+}
+
+/* Glassmorphism utilities - Adapted for Light Mode */
+.glass-panel {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+.neon-border-green {
+  box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1), 0 2px 4px -1px rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.neon-border-purple {
+  box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.1), 0 2px 4px -1px rgba(139, 92, 246, 0.06);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

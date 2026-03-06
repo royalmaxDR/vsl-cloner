@@ -1,0 +1,172 @@
+[
+  {
+    "id": "task_001",
+    "type": "audit",
+    "title": "Auditoria de NF-e: TechSolutions Ltda",
+    "description": "Valide os dados fiscais da nota emitida para garantir conformidade tributária.",
+    "reward": 12.50,
+    "timeEstimate": "5 min",
+    "requiredModule": null,
+    "data": {
+      "imageUrl": "https://picsum.photos/seed/receipt1/400/600",
+      "correctCNPJ": "12.345.678/0001-90",
+      "correctValue": "1.250,00"
+    }
+  },
+  {
+    "id": "task_002",
+    "type": "audit",
+    "title": "Auditoria de NF-e: Mercado Silva",
+    "description": "Verifique a integridade dos valores declarados no cupom fiscal.",
+    "reward": 8.75,
+    "timeEstimate": "3 min",
+    "requiredModule": null,
+    "data": {
+      "imageUrl": "https://picsum.photos/seed/receipt2/400/600",
+      "correctCNPJ": "98.765.432/0001-10",
+      "correctValue": "45,90"
+    }
+  },
+  {
+    "id": "task_003",
+    "type": "training",
+    "title": "Treinamento IA: Reconhecimento Facial",
+    "description": "Classifique expressões faciais para calibração de algoritmos de segurança.",
+    "reward": 22.00,
+    "timeEstimate": "15 min",
+    "requiredModule": "Certificação em IA Visual",
+    "data": {}
+  },
+  {
+    "id": "task_004",
+    "type": "transcription",
+    "title": "Transcrição: Reunião de Board",
+    "description": "Transcreva os 5 minutos finais da reunião executiva.",
+    "reward": 18.00,
+    "timeEstimate": "10 min",
+    "requiredModule": null,
+    "data": {}
+  },
+  {
+    "id": "task_005",
+    "type": "support",
+    "title": "Suporte Nível 1: Chat ao Vivo",
+    "description": "Atenda 3 tickets de dúvidas básicas sobre a plataforma.",
+    "reward": 15.00,
+    "timeEstimate": "20 min",
+    "requiredModule": null,
+    "data": {}
+  },
+  {
+    "id": "task_006",
+    "type": "audit",
+    "title": "Auditoria de NF-e: Posto Gasol",
+    "description": "Confira o valor do abastecimento e o CNPJ do emissor.",
+    "reward": 10.00,
+    "timeEstimate": "4 min",
+    "requiredModule": null,
+    "data": {
+      "imageUrl": "https://picsum.photos/seed/receipt3/400/600",
+      "correctCNPJ": "11.222.333/0001-44",
+      "correctValue": "250,00"
+    }
+  },
+  {
+    "id": "task_007",
+    "type": "training",
+    "title": "Treinamento IA: Veículos Autônomos",
+    "description": "Identifique placas de trânsito em condições de baixa visibilidade.",
+    "reward": 35.00,
+    "timeEstimate": "25 min",
+    "requiredModule": "Certificação em IA Visual",
+    "data": {}
+  },
+  {
+    "id": "task_008",
+    "type": "transcription",
+    "title": "Transcrição: Podcast Tech",
+    "description": "Gere legendas para trecho de podcast sobre tecnologia.",
+    "reward": 14.50,
+    "timeEstimate": "8 min",
+    "requiredModule": null,
+    "data": {}
+  },
+  {
+    "id": "task_009",
+    "type": "support",
+    "title": "Suporte Premium: E-mail Corporativo",
+    "description": "Responda a solicitações de clientes enterprise.",
+    "reward": 45.00,
+    "timeEstimate": "30 min",
+    "requiredModule": "Certificação em Suporte",
+    "data": {}
+  },
+  {
+    "id": "task_010",
+    "type": "audit",
+    "title": "Auditoria de NF-e: Farmácia Bem Estar",
+    "description": "Valide os itens e o valor total da nota fiscal.",
+    "reward": 11.25,
+    "timeEstimate": "5 min",
+    "requiredModule": null,
+    "data": {
+      "imageUrl": "https://picsum.photos/seed/receipt4/400/600",
+      "correctCNPJ": "55.666.777/0001-88",
+      "correctValue": "89,90"
+    }
+  },
+  {
+    "id": "task_011",
+    "type": "training",
+    "title": "Treinamento IA: Diagnóstico Médico",
+    "description": "Identifique anomalias em imagens de raio-x (simulação).",
+    "reward": 50.00,
+    "timeEstimate": "40 min",
+    "requiredModule": "Certificação Internacional",
+    "data": {}
+  },
+  {
+    "id": "task_012",
+    "type": "transcription",
+    "title": "Transcrição: Aula de Direito",
+    "description": "Transcreva trecho de aula sobre legislação tributária.",
+    "reward": 20.00,
+    "timeEstimate": "12 min",
+    "requiredModule": null,
+    "data": {}
+  },
+  {
+    "id": "task_013",
+    "type": "support",
+    "title": "Moderação de Conteúdo",
+    "description": "Avalie 50 comentários denunciados por usuários.",
+    "reward": 16.50,
+    "timeEstimate": "15 min",
+    "requiredModule": null,
+    "data": {}
+  },
+  {
+    "id": "task_014",
+    "type": "audit",
+    "title": "Auditoria de NF-e: Restaurante Sabor",
+    "description": "Verifique se a taxa de serviço foi calculada corretamente.",
+    "reward": 9.50,
+    "timeEstimate": "4 min",
+    "requiredModule": null,
+    "data": {
+      "imageUrl": "https://picsum.photos/seed/receipt5/400/600",
+      "correctCNPJ": "44.333.222/0001-11",
+      "correctValue": "128,50"
+    }
+  },
+  {
+    "id": "task_015",
+    "type": "training",
+    "title": "Treinamento IA: Análise de Sentimento",
+    "description": "Classifique reviews de produtos como positivos, negativos ou neutros.",
+    "reward": 28.00,
+    "timeEstimate": "18 min",
+    "requiredModule": "Certificação em Suporte",
+    "data": {}
+  }
+]
