@@ -7,6 +7,7 @@ import { JOBS_DB } from '@/data/jobs';
 import JobDetailsModal from './JobDetailsModal';
 
 import CompanyLogo from './CompanyLogo';
+import UserAvatar from './UserAvatar';
 
 export default function DashboardView({ 
   balances, 
@@ -38,13 +39,21 @@ export default function DashboardView({
   const [durationFilter, setDurationFilter] = useState<string>('Todos');
 
   const categories = ['Todas', 'Iniciante', 'Especialista', 'Global'];
-  const durations = ['Todos', 'Rápido', 'Médio', '10 min', '15 min'];
+  const durations = ['Todos', '15 min', '20 min', '30 min'];
+
+  const [visibleJobs, setVisibleJobs] = useState(20);
 
   const filteredMissions = missions.filter(m => {
     if (activeCategory !== 'Todas' && m.category !== activeCategory) return false;
     if (durationFilter !== 'Todos' && m.duration !== durationFilter) return false;
     return true;
   });
+
+  const displayedMissions = filteredMissions.slice(0, visibleJobs);
+
+  const handleLoadMore = () => {
+    setVisibleJobs(prev => prev + 20);
+  };
 
   const checkLockStatus = (mission: Mission) => {
     // Level Lock
@@ -55,7 +64,6 @@ export default function DashboardView({
   };
 
   const dailyGoal = 10;
-  const dailyProgress = Math.min((profile.tasksCompleted / dailyGoal) * 100, 100);
 
   if (loading) {
     return (
@@ -76,7 +84,7 @@ export default function DashboardView({
         </div>
         <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 to-blue-400 p-0.5 shadow-lg shadow-blue-900/20">
           <div className="w-full h-full bg-slate-900 rounded-full flex items-center justify-center overflow-hidden">
-            <Image src={`https://picsum.photos/seed/${profile.name}/100/100`} alt="Avatar" width={48} height={48} />
+            <UserAvatar src={profile.avatar} name={profile.name} size={48} />
           </div>
         </div>
       </div>
@@ -213,7 +221,7 @@ export default function DashboardView({
               </p>
             </div>
           ) : (
-            filteredMissions.map((mission) => {
+            displayedMissions.map((mission) => {
               const { locked, reason } = checkLockStatus(mission);
               
               return (
@@ -306,6 +314,15 @@ export default function DashboardView({
             })
           )}
           
+          {filteredMissions.length > visibleJobs && (
+            <button 
+              onClick={handleLoadMore}
+              className="w-full py-4 text-sm font-bold text-slate-400 hover:text-white bg-slate-900/40 hover:bg-slate-800/60 rounded-2xl border border-white/10 transition-all"
+            >
+              Carregar Mais Vagas ({filteredMissions.length - visibleJobs} restantes)
+            </button>
+          )}
+
           {filteredMissions.length === 0 && tasksRemaining > 0 && (
             <div className="text-center py-10 text-gray-500 text-sm">
               Nenhuma vaga encontrada para estes filtros.

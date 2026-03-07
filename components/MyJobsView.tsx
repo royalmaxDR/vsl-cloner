@@ -19,7 +19,7 @@ export default function MyJobsView({
   }[],
   onOpenTask: (mission: Mission) => void
 }) {
-  const [now, setNow] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -69,7 +69,7 @@ export default function MyJobsView({
                           ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
                           : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                       }`}>
-                        {isLocked ? 'BLOQUEADO' : 'LIBERADO'}
+                        {isLocked ? 'EM ANÁLISE' : 'LIBERADO'}
                       </span>
                     </div>
                     <div className="font-bold text-white text-sm leading-tight mb-2">{app.mission.title}</div>
@@ -95,12 +95,12 @@ export default function MyJobsView({
                   >
                     {isLocked ? (
                       <>
-                        AGUARDANDO LIBERAÇÃO
+                        AGUARDANDO APROVAÇÃO
                         <Lock className="w-4 h-4" />
                       </>
                     ) : (
                       <>
-                        INICIAR DIA 1
+                        INICIAR TRABALHO
                         <Play className="w-4 h-4 fill-current" />
                       </>
                     )}

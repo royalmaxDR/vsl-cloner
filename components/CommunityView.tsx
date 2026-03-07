@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, Lock, MessageCircle, Heart, Share2, Star, CheckCircle2, X, Send } from 'lucide-react';
-import Image from 'next/image';
 import { UserProfile } from '@/app/page';
+import UserAvatar from './UserAvatar';
 
 const brazilianNames = [
   "Marcos Vinícius", "Ana Beatriz", "Cláudia Souza", "Ricardo Lima",
@@ -209,11 +209,11 @@ export default function CommunityView({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Users className="w-6 h-6 text-primary" />
+            <Users className="w-6 h-6 text-blue-500" />
             Comunidade VIP
           </h1>
           <p className="text-sm text-gray-400 flex items-center gap-2 mt-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"></span>
             {onlineCount} membros online agora
           </p>
         </div>
@@ -222,37 +222,44 @@ export default function CommunityView({
       {/* Content Area - Blurred if not a member */}
       <div className={`space-y-6 transition-all duration-500 ${!profile.isCommunityMember ? 'blur-md opacity-50 pointer-events-none select-none' : ''}`}>
         
-        {/* Online Members Horizontal Scroll */}
+        {/* Online Members Grid */}
         <div>
-          <h2 className="text-sm font-bold text-white mb-3 px-1">Veteranos Online (Clique para conversar)</h2>
-          <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-2">
-            {profiles.filter(p => p.isOnline).map(member => (
+          <h2 className="text-sm font-bold text-slate-100 mb-4 px-1 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+            Veteranos Online (Clique para conversar)
+          </h2>
+          <div className="grid grid-cols-4 sm:grid-cols-5 gap-4">
+            {profiles.filter(p => p.isOnline).slice(0, 10).map(member => (
               <button 
                 key={member.id} 
                 onClick={() => openChat(member)}
-                className="flex flex-col items-center gap-1 min-w-[72px] focus:outline-none group"
+                className="flex flex-col items-center gap-2 focus:outline-none group"
               >
                 <div className="relative transition-transform group-hover:scale-105">
-                  <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-primary to-accent">
-                    <div className="w-full h-full rounded-full overflow-hidden border-2 border-background">
-                      <Image src={member.avatar} alt={member.name} width={64} height={64} className="object-cover" />
-                    </div>
+                  <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-lg shadow-blue-900/20">
+                    <UserAvatar src={member.avatar} name={member.name} size={52} className="border-2 border-slate-950" />
                   </div>
-                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-background rounded-full"></div>
+                  <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-slate-950 rounded-full shadow-sm"></div>
                 </div>
-                <span className="text-[10px] font-medium text-gray-300 truncate w-full text-center group-hover:text-white">
+                <span className="text-[10px] font-medium text-slate-400 truncate w-full text-center group-hover:text-slate-200 transition-colors">
                   {member.name.split(' ')[0]}
                 </span>
               </button>
             ))}
+            <button className="flex flex-col items-center gap-2 focus:outline-none group">
+               <div className="w-14 h-14 rounded-full bg-slate-800/50 border border-white/5 flex items-center justify-center text-slate-500 group-hover:bg-slate-800 transition-colors">
+                 <span className="text-xs font-bold">+{onlineCount - 10}</span>
+               </div>
+               <span className="text-[10px] font-medium text-slate-500">Ver todos</span>
+            </button>
           </div>
         </div>
 
         {/* Create Post */}
-        <div className="glass-panel rounded-3xl p-4 border-white/5">
+        <div className="glass-panel rounded-3xl p-4 border-white/5 bg-slate-900/40 backdrop-blur-xl">
           <form onSubmit={handlePost} className="flex gap-3">
-            <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-white/10">
-              <Image src="https://picsum.photos/seed/user/100/100" alt="Você" width={40} height={40} />
+            <div className="flex-shrink-0">
+              <UserAvatar src={`https://picsum.photos/seed/${profile.name}/100/100`} name={profile.name} size={40} />
             </div>
             <div className="flex-grow flex flex-col gap-2">
               <textarea 
@@ -266,7 +273,7 @@ export default function CommunityView({
                 <button 
                   type="submit"
                   disabled={!postInput.trim() || isPosting}
-                  className="bg-primary hover:bg-primary-hover text-white text-xs font-bold py-2 px-4 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 px-4 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-blue-900/20"
                 >
                   {isPosting ? (
                     <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -285,16 +292,14 @@ export default function CommunityView({
         {/* Feed */}
         <div className="space-y-4">
           {feedPosts.map(post => (
-            <div key={post.id} className="glass-panel rounded-3xl p-5 border-white/5">
+            <div key={post.id} className="glass-panel rounded-3xl p-5 border-white/5 bg-slate-900/40 backdrop-blur-xl shadow-xl">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full overflow-hidden">
-                    <Image src={post.avatar} alt={post.author} width={40} height={40} />
-                  </div>
+                  <UserAvatar src={post.avatar} name={post.author} size={40} />
                   <div>
                     <div className="flex items-center gap-1">
                       <span className="font-bold text-white text-sm">{post.author}</span>
-                      <CheckCircle2 className="w-3 h-3 text-primary" />
+                      <CheckCircle2 className="w-3 h-3 text-blue-500" />
                     </div>
                     <span className="text-[10px] text-gray-500">Ganhou R$ {post.earnings} • {post.time}</span>
                   </div>
@@ -306,7 +311,7 @@ export default function CommunityView({
               </p>
               
               <div className="flex items-center gap-6 pt-3 border-t border-white/5">
-                <button className="flex items-center gap-1.5 text-gray-400 hover:text-primary transition-colors">
+                <button className="flex items-center gap-1.5 text-gray-400 hover:text-blue-400 transition-colors">
                   <Heart className="w-4 h-4" />
                   <span className="text-xs font-bold">{post.likes}</span>
                 </button>
@@ -330,21 +335,19 @@ export default function CommunityView({
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className="fixed inset-x-0 bottom-0 z-50 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-96 bg-black/95 backdrop-blur-xl border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col h-[60vh] sm:h-[500px]"
+            className="fixed inset-x-0 bottom-0 z-50 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-96 bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col h-[60vh] sm:h-[500px]"
           >
             {/* Chat Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
+            <div className="flex items-center justify-between p-4 border-b border-white/10 bg-slate-900/50">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10">
-                    <Image src={activeChatUser.avatar} alt={activeChatUser.name} width={40} height={40} />
-                  </div>
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-black rounded-full"></div>
+                  <UserAvatar src={activeChatUser.avatar} name={activeChatUser.name} size={40} />
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full"></div>
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-1">
                     {activeChatUser.name}
-                    <CheckCircle2 className="w-3 h-3 text-primary" />
+                    <CheckCircle2 className="w-3 h-3 text-blue-500" />
                   </h3>
                   <p className="text-[10px] text-emerald-400">Online agora</p>
                 </div>
@@ -358,13 +361,13 @@ export default function CommunityView({
             </div>
 
             {/* Chat Messages */}
-            <div className="flex-grow overflow-y-auto p-4 space-y-4">
+            <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar">
               {chatMessages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+                  <div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${
                     msg.isUser 
-                      ? 'bg-primary text-white rounded-tr-none' 
-                      : 'bg-white/10 text-gray-200 rounded-tl-none border border-white/5'
+                      ? 'bg-blue-600 text-white rounded-tr-none shadow-blue-900/20' 
+                      : 'bg-slate-800 text-gray-200 rounded-tl-none border border-white/5'
                   }`}>
                     {msg.text}
                   </div>
@@ -374,18 +377,18 @@ export default function CommunityView({
             </div>
 
             {/* Chat Input */}
-            <form onSubmit={sendMessage} className="p-4 border-t border-white/10 flex gap-2">
+            <form onSubmit={sendMessage} className="p-4 border-t border-white/10 flex gap-2 bg-slate-900/50">
               <input 
                 type="text" 
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="Digite sua mensagem..."
-                className="flex-grow bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm text-white focus:outline-none focus:border-primary transition-colors"
+                className="flex-grow bg-slate-950/50 border border-white/10 rounded-full px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors placeholder:text-slate-600"
               />
               <button 
                 type="submit"
                 disabled={!chatInput.trim()}
-                className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-900/20"
               >
                 <Send className="w-4 h-4 ml-0.5" />
               </button>
@@ -396,16 +399,16 @@ export default function CommunityView({
 
       {/* Paywall Overlay */}
       {!profile.isCommunityMember && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center px-4 pt-20 pb-32 bg-gradient-to-t from-background via-background/80 to-transparent">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center px-4 pt-20 pb-32 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent backdrop-blur-[2px]">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-panel rounded-3xl p-6 border-primary/20 bg-black/60 backdrop-blur-xl max-w-sm w-full text-center relative overflow-hidden"
+            className="glass-panel rounded-3xl p-6 border-blue-500/20 bg-slate-900/80 backdrop-blur-xl max-w-sm w-full text-center relative overflow-hidden shadow-2xl"
           >
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-accent to-primary"></div>
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-600"></div>
             
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4 border border-primary/30">
-              <Lock className="w-8 h-8 text-primary" />
+            <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-4 border border-blue-500/20 shadow-[0_0_20px_rgba(37,99,235,0.2)]">
+              <Lock className="w-8 h-8 text-blue-500" />
             </div>
             
             <h2 className="text-xl font-bold text-white mb-2">Acesso Restrito aos Melhores</h2>
@@ -414,7 +417,7 @@ export default function CommunityView({
               Junte-se a +1.500 colaboradores ativos, acesse dicas de tarefas de alto valor e receba suporte dos veteranos.
             </p>
 
-            <div className="bg-white/5 rounded-2xl p-4 mb-6 border border-white/10">
+            <div className="bg-slate-950/50 rounded-2xl p-4 mb-6 border border-white/10">
               <div className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Taxa de Adesão Única</div>
               <div className="text-3xl font-bold text-white">R$ 19,90</div>
             </div>
@@ -422,7 +425,7 @@ export default function CommunityView({
             <button 
               onClick={handleJoin}
               disabled={isJoining}
-              className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/40"
             >
               {isJoining ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

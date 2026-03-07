@@ -35,50 +35,52 @@ export default function SupportView() {
   return (
     <div className="max-w-md mx-auto px-4 py-6 space-y-6 pb-24">
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4 border border-primary/20">
-          <MessageCircle className="w-8 h-8 text-primary" />
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10 mb-4 border border-blue-500/20 shadow-lg shadow-blue-900/20">
+          <MessageCircle className="w-8 h-8 text-blue-500" />
         </div>
-        <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">Central de Suporte</h1>
-        <p className="text-gray-400 text-sm">
+        <h1 className="text-2xl font-bold text-slate-100 mb-2 tracking-tight">Central de Suporte</h1>
+        <p className="text-slate-400 text-sm">
           Tire suas dúvidas e entenda como a plataforma funciona.
         </p>
       </div>
 
       {/* Contact Widget */}
-      <div className="glass-panel rounded-3xl p-6 border-white/5 flex items-center justify-between mb-8">
+      <div className="glass-panel rounded-3xl p-6 border-white/10 flex items-center justify-between mb-8 bg-slate-900/40 backdrop-blur-xl shadow-xl">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0">
-            <MessageCircle className="w-6 h-6 text-primary" />
+          <div className="w-12 h-12 rounded-full bg-slate-800/50 flex items-center justify-center flex-shrink-0 border border-white/5">
+            <MessageCircle className="w-6 h-6 text-blue-500" />
           </div>
           <div>
-            <h3 className="font-bold text-white">Atendimento Online</h3>
-            <p className="text-xs text-gray-400">Seg a Sex, 09h às 18h</p>
+            <h3 className="font-bold text-slate-100">Atendimento Online</h3>
+            <p className="text-xs text-slate-400">Seg a Sex, 09h às 18h</p>
           </div>
         </div>
-        <button className="bg-primary/10 text-primary hover:bg-primary/20 font-bold py-2 px-4 rounded-xl text-sm transition-colors border border-primary/20">
+        <button className="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 font-bold py-2 px-4 rounded-xl text-sm transition-colors border border-blue-500/20">
           Iniciar Chat
         </button>
       </div>
 
       {/* FAQ Section */}
       <div>
-        <h3 className="text-lg font-bold text-white tracking-tight mb-4">Perguntas Frequentes</h3>
+        <h3 className="text-lg font-bold text-slate-100 tracking-tight mb-4">Perguntas Frequentes</h3>
         <div className="space-y-3">
           {faqs.map((faq) => (
             <div 
               key={faq.id} 
-              className="glass-panel rounded-2xl border-white/5 overflow-hidden transition-all"
+              className="glass-panel rounded-2xl border-white/10 overflow-hidden transition-all bg-slate-900/40 backdrop-blur-xl"
             >
               <button
                 onClick={() => setOpenFaq(openFaq === faq.id ? null : faq.id)}
                 className="w-full flex items-center justify-between p-5 text-left focus:outline-none"
               >
                 <div className="flex items-center gap-3">
-                  <faq.icon className="w-5 h-5 text-gray-400" />
-                  <span className="font-bold text-white text-sm">{faq.question}</span>
+                  <div className={`p-2 rounded-lg ${openFaq === faq.id ? 'bg-blue-500/10 text-blue-400' : 'bg-slate-800/50 text-slate-400'}`}>
+                    <faq.icon className="w-5 h-5" />
+                  </div>
+                  <span className={`font-bold text-sm ${openFaq === faq.id ? 'text-blue-400' : 'text-slate-200'}`}>{faq.question}</span>
                 </div>
                 <ChevronDown 
-                  className={`w-5 h-5 text-gray-500 transition-transform ${openFaq === faq.id ? 'rotate-180' : ''}`} 
+                  className={`w-5 h-5 text-slate-500 transition-transform ${openFaq === faq.id ? 'rotate-180 text-blue-400' : ''}`} 
                 />
               </button>
               
@@ -90,7 +92,7 @@ export default function SupportView() {
                     exit={{ height: 0, opacity: 0 }}
                     className="px-5 pb-5 pt-0"
                   >
-                    <div className="text-sm text-gray-400 leading-relaxed border-t border-white/5 pt-4">
+                    <div className="text-sm text-slate-400 leading-relaxed border-t border-white/5 pt-4 pl-10">
                       {faq.answer}
                     </div>
                   </motion.div>

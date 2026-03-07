@@ -49,8 +49,27 @@ export type Mission = {
   completed: boolean;
   level: 1 | 2 | 3 | 4;
   currency: 'BRL' | 'USD' | 'EUR';
-  duration: 'Rápido' | 'Médio' | 'Longo' | '5 min' | '10 min' | '15 min';
+  duration: 'Rápido' | 'Médio' | 'Longo' | '15 min' | '20 min';
   description?: string;
+  briefing?: {
+    context: string;
+    requirements: string[];
+    rubric: { criterion: string; weight: number }[];
+    estimatedTime: number;
+  };
+  steps?: {
+    id: string;
+    label: string;
+    type: 'check' | 'input' | 'select';
+    options?: string[];
+    correctValue?: string | number;
+    hint?: string;
+  }[];
+  evidence?: {
+    type: 'text' | 'image' | 'mixed';
+    minLength?: number;
+    placeholder?: string;
+  };
   data?: any;
 };
 
