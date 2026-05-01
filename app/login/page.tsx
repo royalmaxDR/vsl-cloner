@@ -1,36 +1,67 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader2, Zap } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // If already logged in, redirect immediately without going through middleware
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        const redirectTo = searchParams.get('redirectTo');
+        const dest =
+          redirectTo && redirectTo.startsWith('/') && redirectTo !== '/login' && redirectTo !== '/signup'
+            ? redirectTo
+            : '/dashboard';
+        router.replace(dest);
+      }
+    });
+  }, [router, searchParams]);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (error) {
-      setError(error.message === 'Invalid login credentials'
-        ? 'E-mail ou senha incorretos.'
-        : error.message);
+    if (authError) {
+      let msg = authError.message;
+      if (msg === 'Invalid login credentials') {
+        msg = 'E-mail ou senha incorretos.';
+      } else if (msg.toLowerCase().includes('email not confirmed')) {
+        msg = 'E-mail não confirmado. Verifique sua caixa de entrada ou crie uma nova conta.';
+      } else if (msg.toLowerCase().includes('too many requests')) {
+        msg = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+      }
+      setError(msg);
       setLoading(false);
       return;
     }
 
-    router.push('/dashboard');
-    router.refresh();
+    if (data.session) {
+      const redirectTo = searchParams.get('redirectTo');
+      const dest =
+        redirectTo && redirectTo.startsWith('/') && redirectTo !== '/login' && redirectTo !== '/signup'
+          ? redirectTo
+          : '/dashboard';
+      router.push(dest);
+      router.refresh();
+    }
   }
 
   return (
@@ -124,5 +155,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#020617]">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

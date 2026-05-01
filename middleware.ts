@@ -3,6 +3,21 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Auth pages — pass through without checking session to avoid loop
+  const authPaths = ['/login', '/signup'];
+  const isAuthPage = authPaths.some((p) => pathname === p || pathname.startsWith(p + '/'));
+
+  // Protected routes
+  const protectedPaths = ['/dashboard', '/editor'];
+  const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
+
+  // If it's neither auth nor protected, just pass through
+  if (!isAuthPage && !isProtected) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -26,25 +41,29 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Use getSession (reads from cookie) instead of getUser (makes network call)
+  // This avoids timing issues with cookie propagation after login
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  const { pathname } = request.nextUrl;
+  const isAuthenticated = !!session;
 
-  // Protected routes
-  const protectedPaths = ['/dashboard', '/editor'];
-  const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
-
-  if (isProtected && !user) {
+  // Redirect unauthenticated users away from protected routes
+  if (isProtected && !isAuthenticated) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirectTo', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect logged-in users away from auth pages
-  if ((pathname === '/login' || pathname === '/signup') && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  // Redirect authenticated users away from auth pages
+  if (isAuthPage && isAuthenticated) {
+    const redirectTo = request.nextUrl.searchParams.get('redirectTo');
+    const destination =
+      redirectTo && redirectTo.startsWith('/') && !authPaths.includes(redirectTo)
+        ? redirectTo
+        : '/dashboard';
+    return NextResponse.redirect(new URL(destination, request.url));
   }
 
   return supabaseResponse;
@@ -52,6 +71,13 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|public|p/).*)',
+    /*
+     * Match all paths EXCEPT:
+     * - _next/static, _next/image (Next.js internals)
+     * - favicon.ico, public assets
+     * - /p/ (public published pages)
+     * - /api/ (API routes handle their own auth)
+     */
+    '/((?!_next/static|_next/image|favicon\\.ico|public|p/|api/).*)',
   ],
 };

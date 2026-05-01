@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff, Loader2, Zap, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Zap } from 'lucide-react';
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,7 +14,6 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -31,41 +30,44 @@ export default function SignupPage() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    // Sign up — with email confirmation disabled in Supabase, this creates
+    // a confirmed user immediately and returns a session
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
     });
 
-    if (error) {
-      setError(error.message);
+    if (signUpError) {
+      let msg = signUpError.message;
+      if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('user already exists')) {
+        msg = 'Este e-mail já está cadastrado. Faça login ou use outro e-mail.';
+      }
+      setError(msg);
       setLoading(false);
       return;
     }
 
-    setSuccess(true);
-    setLoading(false);
-
-    // Auto-login attempt after signup
-    const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-    if (!loginError) {
+    // If signup returned a session directly (email confirmation disabled), use it
+    if (signUpData.session) {
       router.push('/dashboard');
       router.refresh();
+      return;
     }
-  }
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#020617] px-4">
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Conta criada!</h2>
-          <p className="text-slate-400 mb-6">Redirecionando para o dashboard...</p>
-        </div>
-      </div>
-    );
+    // Fallback: try to sign in immediately (in case signup didn't return session)
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError || !signInData.session) {
+      // Signup succeeded but can't auto-login — redirect to login page with message
+      router.push('/login?message=conta-criada');
+      return;
+    }
+
+    router.push('/dashboard');
+    router.refresh();
   }
 
   return (
@@ -161,5 +163,19 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#020617]">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        </div>
+      }
+    >
+      <SignupForm />
+    </Suspense>
   );
 }
