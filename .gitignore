@@ -5,3 +5,6 @@ coverage/
 *.log
 .env*
 !.env.example
+tsconfig.tsbuildinfo
+local-engine/node_modules/
+local-engine/out/

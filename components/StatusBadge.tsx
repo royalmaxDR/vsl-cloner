@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle, Globe } from 'lucide-react';
+import { Loader2, CheckCircle, Globe, AlertCircle, Search, Download } from 'lucide-react';
 import type { ProjectStatus } from '@/lib/supabase';
 
 const config: Record<ProjectStatus, { label: string; className: string; icon: React.ReactNode }> = {
@@ -6,6 +6,16 @@ const config: Record<ProjectStatus, { label: string; className: string; icon: Re
     label: 'Extraindo',
     className: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
     icon: <Loader2 className="w-3 h-3 animate-spin" />,
+  },
+  analisando: {
+    label: 'Analisando',
+    className: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+    icon: <Search className="w-3 h-3 animate-pulse" />,
+  },
+  clonando: {
+    label: 'Clonando',
+    className: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+    icon: <Download className="w-3 h-3 animate-pulse" />,
   },
   pronto: {
     label: 'Pronto',
@@ -16,6 +26,11 @@ const config: Record<ProjectStatus, { label: string; className: string; icon: Re
     label: 'Publicado',
     className: 'bg-green-500/15 text-green-400 border-green-500/30',
     icon: <Globe className="w-3 h-3" />,
+  },
+  erro: {
+    label: 'Erro',
+    className: 'bg-red-500/15 text-red-400 border-red-500/30',
+    icon: <AlertCircle className="w-3 h-3" />,
   },
 };
 

@@ -1,26 +1,25 @@
 /**
- * Helper client-side para fazer fetch com o token de autenticação do Supabase.
- * Obtém o access_token da sessão atual e o envia no header Authorization.
+ * Helper de fetch para chamadas autenticadas ao backend interno.
+ *
+ * Como agora usamos cookies (via @supabase/ssr), NÃO precisamos mais
+ * enviar Bearer token manualmente. O cookie de sessão é enviado
+ * automaticamente pelo browser. Este helper apenas centraliza
+ * `credentials: 'include'` e o Content-Type padrão.
+ *
+ * Mantido como `authFetch` para compatibilidade com o código existente.
  */
-import { supabase } from './supabase';
-
 export async function authFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const { data: { session } } = await supabase.auth.getSession();
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
 
-  if (session?.access_token) {
-    headers['Authorization'] = `Bearer ${session.access_token}`;
-  }
-
   return fetch(url, {
     ...options,
     headers,
+    credentials: 'same-origin',
   });
 }

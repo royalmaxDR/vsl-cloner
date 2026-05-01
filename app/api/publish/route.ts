@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, createSupabaseAdminClient } from '@/lib/supabase-server';
+import { getCurrentUser, createSupabaseAdminClient } from '@/lib/supabase-server';
 import type { ExtractedData, Customizations } from '@/lib/supabase';
 
 function generateSlug(name: string): string {
@@ -37,7 +37,7 @@ function applyCustomizations(
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request);
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }

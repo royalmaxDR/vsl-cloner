@@ -1,25 +1,21 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * Supabase client (browser) usando @supabase/ssr.
+ *
+ * createBrowserClient grava a sessão em cookies (em vez de localStorage),
+ * o que permite que o servidor leia a mesma sessão via createServerClient.
+ * Isso é essencial para o fluxo cookie-based que substitui o Bearer token
+ * e elimina o problema 401 nas API routes.
+ */
+import { createBrowserClient } from '@supabase/ssr';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Server-side client with service role (bypasses RLS) — use only in API routes
-export function createServiceClient() {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) {
-    // Fallback to anon key if service role not set (limited functionality)
-    return createClient(supabaseUrl, supabaseAnonKey);
-  }
-  return createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ProjectStatus = 'extraindo' | 'pronto' | 'publicado';
+export type ProjectStatus = 'extraindo' | 'pronto' | 'publicado' | 'analisando' | 'clonando' | 'erro';
 
 export interface Project {
   id: string;
@@ -31,6 +27,8 @@ export interface Project {
   customizations: Customizations | null;
   published_url: string | null;
   slug: string | null;
+  // Novos campos para o motor de clonagem
+  clone_data?: CloneData | null;
   created_at: string;
   updated_at: string;
 }
@@ -99,6 +97,10 @@ export interface ExtractedAssets {
   images: string[];
   scripts: string[];
   stylesheets: string[];
+  fonts?: string[];
+  videos?: string[];
+  audios?: string[];
+  jsonAnimations?: string[];
 }
 
 export interface Customizations {
@@ -108,4 +110,38 @@ export interface Customizations {
   subheadlineText: string | null;
   ctaButtonText: string | null;
   ctaButtonColor: string | null;
+}
+
+// ─── Clone engine types ───────────────────────────────────────────────────────
+
+export interface CloneAssetEntry {
+  url: string;
+  localPath: string;
+  type: 'image' | 'script' | 'stylesheet' | 'font' | 'video' | 'audio' | 'json' | 'other';
+  size?: number;
+  contentType?: string;
+  ok: boolean;
+  error?: string;
+}
+
+export interface CloneData {
+  /** Quando o clone foi gerado */
+  clonedAt: string;
+  /** URL final (após redirects) */
+  finalUrl: string;
+  /** Tamanho do HTML original */
+  htmlLength: number;
+  /** Lista de assets baixados */
+  assets: CloneAssetEntry[];
+  /** Estatísticas resumidas */
+  stats: {
+    totalAssets: number;
+    successAssets: number;
+    failedAssets: number;
+    totalBytes: number;
+  };
+  /** Aviso de Cloudflare/anti-bot detectado */
+  warnings: string[];
+  /** Se o motor local é recomendado */
+  needsLocalEngine: boolean;
 }

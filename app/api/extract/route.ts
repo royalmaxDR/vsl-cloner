@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractVSL } from '@/lib/extractor';
-import { authenticateRequest, createSupabaseAdminClient } from '@/lib/supabase-server';
+import { getCurrentUser, createSupabaseAdminClient } from '@/lib/supabase-server';
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request);
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }

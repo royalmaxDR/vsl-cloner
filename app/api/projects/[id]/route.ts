@@ -1,101 +1,102 @@
+/**
+ * API Routes para um projeto específico (GET/PUT/DELETE).
+ * Auth via cookie de sessão Supabase (createSupabaseServerClient).
+ */
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, createSupabaseAdminClient } from '@/lib/supabase-server';
+import {
+  getCurrentUser,
+  createSupabaseAdminClient,
+} from '@/lib/supabase-server';
 
-// GET /api/projects/[id]
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await params;
-    const user = await authenticateRequest(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-
-    const supabase = createSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single();
-
-    if (error || !data) {
-      return NextResponse.json({ error: 'Projeto não encontrado' }, { status: 404 });
-    }
-
-    return NextResponse.json({ project: data });
-  } catch (error) {
-    console.error('[GET /api/projects/[id]]', error);
-    return NextResponse.json({ error: 'Erro ao buscar projeto' }, { status: 500 });
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
+
+  const { id } = await params;
+  const supabase = createSupabaseAdminClient();
+
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (error || !data) {
+    return NextResponse.json({ error: 'Projeto não encontrado' }, { status: 404 });
+  }
+
+  return NextResponse.json({ project: data });
 }
 
-// PUT /api/projects/[id]
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await params;
-    const user = await authenticateRequest(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { name, customizations, status } = body;
-
-    const updateData: Record<string, unknown> = {};
-    if (name !== undefined) updateData.name = name;
-    if (customizations !== undefined) updateData.customizations = customizations;
-    if (status !== undefined) updateData.status = status;
-
-    const supabase = createSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from('projects')
-      .update(updateData)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single();
-
-    if (error || !data) {
-      return NextResponse.json({ error: 'Projeto não encontrado' }, { status: 404 });
-    }
-
-    return NextResponse.json({ project: data });
-  } catch (error) {
-    console.error('[PUT /api/projects/[id]]', error);
-    return NextResponse.json({ error: 'Erro ao atualizar projeto' }, { status: 500 });
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
+
+  const { id } = await params;
+  const body = await request.json().catch(() => ({}));
+  const { name, customizations, status } = body as {
+    name?: string;
+    customizations?: unknown;
+    status?: string;
+  };
+
+  const updateData: Record<string, unknown> = {};
+  if (typeof name === 'string') updateData.name = name.trim();
+  if (customizations !== undefined) updateData.customizations = customizations;
+  if (typeof status === 'string') updateData.status = status;
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ error: 'Nada para atualizar' }, { status: 400 });
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from('projects')
+    .update(updateData)
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select()
+    .single();
+
+  if (error || !data) {
+    return NextResponse.json({ error: error?.message || 'Erro' }, { status: 500 });
+  }
+
+  return NextResponse.json({ project: data });
 }
 
-// DELETE /api/projects/[id]
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await params;
-    const user = await authenticateRequest(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-
-    const supabase = createSupabaseAdminClient();
-    const { error } = await supabase
-      .from('projects')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('[DELETE /api/projects/[id]]', error);
-    return NextResponse.json({ error: 'Erro ao deletar projeto' }, { status: 500 });
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
+
+  const { id } = await params;
+  const supabase = createSupabaseAdminClient();
+
+  const { error } = await supabase
+    .from('projects')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }

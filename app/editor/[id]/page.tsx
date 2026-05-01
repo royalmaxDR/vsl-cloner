@@ -1,147 +1,118 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { authFetch } from '@/lib/auth-fetch';
-import type { Project, ExtractedData, Customizations, PlayerData, TrackingData, CtaData, CheckoutData } from '@/lib/supabase';
+import type {
+  Project,
+  ExtractedData,
+  ExtractedAssets,
+  CloneData,
+} from '@/lib/supabase';
 import StatusBadge from '@/components/StatusBadge';
 import {
   ArrowLeft,
-  Save,
-  Globe,
   Loader2,
   Zap,
-  Video,
-  Tag,
-  ShoppingCart,
-  BarChart3,
-  Clock,
-  CheckCircle,
-  Copy,
+  AlertCircle,
+  Search,
+  Download,
+  Eye,
+  PackageOpen,
+  Globe,
   RefreshCw,
   ExternalLink,
-  AlertCircle,
+  Cloud,
+  Cpu,
+  CheckCircle2,
+  XCircle,
+  FileCode,
+  Image as ImageIcon,
+  FileVideo,
+  FileAudio,
+  Type,
 } from 'lucide-react';
 
+type ProjectWithClone = Project & {
+  clone_data: (CloneData & { previewUrl?: string; zipUrl?: string }) | null;
+};
+
+interface AnalysisResult {
+  success: boolean;
+  url: string;
+  data: ExtractedData;
+  assets: ExtractedAssets;
+  metadata: Record<string, unknown>;
+}
+
 export default function EditorPage() {
+  const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
 
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ProjectWithClone | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-  const [reExtracting, setReExtracting] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [cloning, setCloning] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  // Customization state
-  const [checkoutUrl, setCheckoutUrl] = useState('');
-  const [facebookPixelId, setFacebookPixelId] = useState('');
-  const [headlineText, setHeadlineText] = useState('');
-  const [subheadlineText, setSubheadlineText] = useState('');
-  const [ctaButtonText, setCtaButtonText] = useState('');
+  const [needsLocalEngine, setNeedsLocalEngine] = useState(false);
+  const [showLocalGuide, setShowLocalGuide] = useState(false);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
     const res = await authFetch(`/api/projects/${projectId}`);
     if (!res.ok) {
-      window.location.href = '/dashboard';
+      router.push('/dashboard');
       return;
     }
     const data = await res.json();
-    const p: Project = data.project;
-    setProject(p);
-
-    // Populate customization fields
-    const custom = p.customizations as Customizations | null;
-    const extracted = p.extracted_data as ExtractedData | null;
-
-    setCheckoutUrl(custom?.checkoutUrl || extracted?.checkout?.primaryLink || '');
-    setFacebookPixelId(custom?.facebookPixelId || extracted?.tracking?.facebookPixelId || '');
-    setHeadlineText(custom?.headlineText || extracted?.page?.title || '');
-    setSubheadlineText(custom?.subheadlineText || extracted?.page?.description || '');
-    setCtaButtonText(custom?.ctaButtonText || extracted?.cta?.buttons?.[0]?.text || '');
-    setPublishedUrl(p.published_url);
+    setProject(data.project as ProjectWithClone);
     setLoading(false);
-  }, [projectId]);
+  }, [projectId, router]);
 
   useEffect(() => {
     loadProject();
   }, [loadProject]);
 
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    const customizations: Customizations = {
-      checkoutUrl: checkoutUrl || null,
-      facebookPixelId: facebookPixelId || null,
-      headlineText: headlineText || null,
-      subheadlineText: subheadlineText || null,
-      ctaButtonText: ctaButtonText || null,
-      ctaButtonColor: null,
-    };
-
-    const res = await authFetch(`/api/projects/${projectId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ customizations }),
-    });
-
-    if (res.ok) {
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
-    } else {
-      const d = await res.json();
-      setError(d.error || 'Erro ao salvar');
-    }
-    setSaving(false);
-  }
-
-  async function handlePublish() {
-    await handleSave();
-    setPublishing(true);
-    setError(null);
-
-    const res = await authFetch('/api/publish', {
-      method: 'POST',
-      body: JSON.stringify({ projectId }),
-    });
-
-    const data = await res.json();
-    if (res.ok) {
-      setPublishedUrl(data.publishedUrl);
-      setProject((prev) => prev ? { ...prev, status: 'publicado', published_url: data.publishedUrl } : prev);
-    } else {
-      setError(data.error || 'Erro ao publicar');
-    }
-    setPublishing(false);
-  }
-
-  async function handleReExtract() {
+  async function handleAnalyze() {
     if (!project) return;
-    setReExtracting(true);
+    setAnalyzing(true);
     setError(null);
+    setNeedsLocalEngine(false);
 
-    const res = await authFetch('/api/extract', {
+    const res = await authFetch('/api/analyze', {
       method: 'POST',
-      body: JSON.stringify({ url: project.source_url, projectId }),
+      body: JSON.stringify({ url: project.source_url }),
     });
-
-    if (res.ok) {
-      await loadProject();
-    } else {
-      const d = await res.json();
-      setError(d.error || 'Erro na re-extração');
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || 'Falha na análise');
+      if (data.needsLocalEngine) setNeedsLocalEngine(true);
+      setAnalyzing(false);
+      return;
     }
-    setReExtracting(false);
+    setAnalysis(data as AnalysisResult);
+    setAnalyzing(false);
   }
 
-  function copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  async function handleClone() {
+    if (!project) return;
+    setCloning(true);
+    setError(null);
+
+    const res = await authFetch('/api/clone', {
+      method: 'POST',
+      body: JSON.stringify({ projectId: project.id, mode: 'simple' }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || 'Falha ao clonar');
+      setCloning(false);
+      return;
+    }
+    await loadProject();
+    setCloning(false);
   }
 
   if (loading) {
@@ -149,7 +120,7 @@ export default function EditorPage() {
       <div className="min-h-screen bg-[#020617] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 text-blue-400 animate-spin mx-auto mb-3" />
-          <p className="text-slate-400">Carregando projeto...</p>
+          <p className="text-slate-400">Carregando projeto…</p>
         </div>
       </div>
     );
@@ -157,26 +128,20 @@ export default function EditorPage() {
 
   if (!project) return null;
 
-  const extracted = project.extracted_data as ExtractedData | null;
-  const player = extracted?.player as PlayerData | null;
-  const tracking = extracted?.tracking as TrackingData | null;
-  const cta = extracted?.cta as CtaData | null;
-  const checkout = extracted?.checkout as CheckoutData | null;
+  const cloneData = project.clone_data;
 
   return (
     <div className="min-h-screen bg-[#020617]">
-      {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl" />
       </div>
 
-      {/* Header */}
       <header className="relative border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => { window.location.href = '/dashboard'; }}
+              onClick={() => router.push('/dashboard')}
               className="text-slate-400 hover:text-white transition p-1.5 rounded-lg hover:bg-slate-800"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -192,376 +157,489 @@ export default function EditorPage() {
 
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              onClick={handleReExtract}
-              disabled={reExtracting}
-              title="Re-extrair página"
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition disabled:opacity-50"
+              onClick={loadProject}
+              title="Recarregar"
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
             >
-              <RefreshCw className={`w-4 h-4 ${reExtracting ? 'animate-spin' : ''}`} />
-            </button>
-
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white text-sm font-medium px-3 py-2 rounded-lg transition"
-            >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : saveSuccess ? (
-                <CheckCircle className="w-4 h-4 text-green-400" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">{saveSuccess ? 'Salvo!' : 'Salvar'}</span>
-            </button>
-
-            <button
-              onClick={handlePublish}
-              disabled={publishing || !extracted}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all duration-200"
-            >
-              {publishing ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /><span className="hidden sm:inline">Publicando...</span></>
-              ) : (
-                <><Globe className="w-4 h-4" /><span className="hidden sm:inline">Publicar</span></>
-              )}
+              <RefreshCw className="w-4 h-4" />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Source URL */}
+        <div className="glass-panel rounded-xl p-4 flex items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-500 mb-1">URL de origem</p>
+            <a
+              href={project.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-400 hover:text-blue-300 transition font-mono break-all"
+            >
+              {project.source_url}
+            </a>
+          </div>
+          <a
+            href={project.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition flex-shrink-0"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
+
         {error && (
-          <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-start gap-3 text-red-400 text-sm">
+          <div className="glass-panel border border-red-500/30 bg-red-500/5 rounded-xl px-4 py-3 flex items-start gap-3 text-red-400 text-sm">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {publishedUrl && (
-          <div className="mb-6 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-green-400 text-sm min-w-0">
-              <Globe className="w-4 h-4 flex-shrink-0" />
-              <span className="truncate font-medium">{publishedUrl}</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => copyToClipboard(publishedUrl)}
-                className="text-green-400 hover:text-green-300 transition p-1.5 rounded hover:bg-green-500/10"
-              >
-                {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              </button>
-              <a
-                href={publishedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-green-400 hover:text-green-300 transition p-1.5 rounded hover:bg-green-500/10"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Extraction report */}
-          <div className="lg:col-span-1 space-y-4">
-            <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-              Ativos Extraídos
-            </h2>
-
-            {!extracted ? (
-              <div className="glass-panel rounded-xl p-5 text-center">
-                <AlertCircle className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                <p className="text-slate-400 text-sm">Extração ainda não realizada ou falhou.</p>
+            <div className="flex-1">
+              <p>{error}</p>
+              {needsLocalEngine && (
                 <button
-                  onClick={handleReExtract}
-                  disabled={reExtracting}
-                  className="mt-3 text-sm text-blue-400 hover:text-blue-300 transition"
+                  onClick={() => setShowLocalGuide(true)}
+                  className="mt-2 text-xs text-orange-400 hover:text-orange-300 underline"
                 >
-                  Tentar novamente
+                  Este site precisa do motor local. Ver instruções →
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Step indicators */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StepCard
+            stepNum={1}
+            title="Analisar"
+            description="Inspeciona a URL e lista o que foi encontrado"
+            done={!!analysis || !!cloneData}
+            active={!analysis && !cloneData}
+            icon={<Search className="w-5 h-5" />}
+          />
+          <StepCard
+            stepNum={2}
+            title="Clonar tudo"
+            description="Baixa todos os assets e gera o pacote"
+            done={!!cloneData}
+            active={!!analysis && !cloneData}
+            icon={<Download className="w-5 h-5" />}
+          />
+          <StepCard
+            stepNum={3}
+            title="Preview & ZIP"
+            description="Visualize e baixe o clone funcional"
+            done={!!cloneData?.previewUrl}
+            active={!!cloneData}
+            icon={<PackageOpen className="w-5 h-5" />}
+          />
+        </div>
+
+        {/* Step 1: Análise */}
+        {!cloneData && (
+          <section className="glass-panel rounded-2xl p-6">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Search className="w-5 h-5 text-cyan-400" />
+                  Análise da URL
+                </h2>
+                <p className="text-sm text-slate-400 mt-1">
+                  Veja o que o sistema encontrou antes de baixar tudo.
+                </p>
+              </div>
+              <button
+                onClick={handleAnalyze}
+                disabled={analyzing}
+                className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+              >
+                {analyzing ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" />Analisando…</>
+                ) : (
+                  <><Search className="w-4 h-4" />{analysis ? 'Re-analisar' : 'Analisar agora'}</>
+                )}
+              </button>
+            </div>
+
+            {analysis && (
+              <AnalysisReport result={analysis} />
+            )}
+
+            {analysis && (
+              <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleClone}
+                  disabled={cloning}
+                  className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-blue-500/20"
+                >
+                  {cloning ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" />Clonando todos os assets…</>
+                  ) : (
+                    <><Download className="w-4 h-4" />Clonar tudo (motor Vercel)</>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowLocalGuide(true)}
+                  className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-4 py-3 rounded-xl transition border border-slate-700"
+                  title="Para sites com Cloudflare ou SPAs pesadas"
+                >
+                  <Cpu className="w-4 h-4" />
+                  Usar motor local
                 </button>
               </div>
-            ) : (
-              <>
-                {/* Player card */}
-                <div className="glass-panel rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Video className="w-4 h-4 text-purple-400" />
-                    <h3 className="text-sm font-semibold text-white">Player de Vídeo</h3>
-                  </div>
-                  {player ? (
-                    <div className="space-y-2 text-xs">
-                      <InfoRow label="Tipo" value={player.type} highlight />
-                      {player.organizationId && <InfoRow label="Org ID" value={player.organizationId} mono />}
-                      {player.playerId && <InfoRow label="Player ID" value={player.playerId} mono />}
-                      {player.videoId && <InfoRow label="Video ID" value={player.videoId} mono />}
-                      {player.m3u8Urls.length > 0 && (
-                        <div>
-                          <span className="text-slate-500">Manifests .m3u8:</span>
-                          <div className="mt-1 space-y-1">
-                            {player.m3u8Urls.slice(0, 3).map((url, i) => (
-                              <div key={i} className="bg-slate-800 rounded px-2 py-1 font-mono text-slate-300 truncate">
-                                {url.substring(0, 60)}...
-                              </div>
-                            ))}
-                            {player.m3u8Urls.length > 3 && (
-                              <span className="text-slate-500">+{player.m3u8Urls.length - 3} mais</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {player.posterUrl && (
-                        <div>
-                          <span className="text-slate-500">Poster:</span>
-                          <img
-                            src={player.posterUrl}
-                            alt="poster"
-                            className="mt-1 rounded w-full h-20 object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-500">Player não identificado</p>
-                  )}
-                </div>
-
-                {/* Tracking card */}
-                <div className="glass-panel rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <BarChart3 className="w-4 h-4 text-blue-400" />
-                    <h3 className="text-sm font-semibold text-white">Rastreamento</h3>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <InfoRow
-                      label="Facebook Pixel"
-                      value={tracking?.facebookPixelId || '—'}
-                      mono={!!tracking?.facebookPixelId}
-                    />
-                    <InfoRow
-                      label="Google Analytics"
-                      value={tracking?.googleAnalyticsId || '—'}
-                      mono={!!tracking?.googleAnalyticsId}
-                    />
-                    <InfoRow
-                      label="UTMify"
-                      value={tracking?.utmify ? 'Detectado' : 'Não detectado'}
-                      highlight={tracking?.utmify}
-                    />
-                  </div>
-                </div>
-
-                {/* CTA card */}
-                <div className="glass-panel rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Clock className="w-4 h-4 text-yellow-400" />
-                    <h3 className="text-sm font-semibold text-white">CTA</h3>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <InfoRow
-                      label="Delay"
-                      value={cta?.delay ? `${cta.delay}ms (${cta.delayParam})` : '—'}
-                    />
-                    <InfoRow
-                      label="Botões encontrados"
-                      value={String(cta?.buttons?.length || 0)}
-                    />
-                  </div>
-                </div>
-
-                {/* Checkout card */}
-                <div className="glass-panel rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <ShoppingCart className="w-4 h-4 text-green-400" />
-                    <h3 className="text-sm font-semibold text-white">Checkout</h3>
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    {checkout?.links && checkout.links.length > 0 ? (
-                      checkout.links.slice(0, 3).map((link, i) => (
-                        <div key={i} className="bg-slate-800 rounded px-2 py-1 font-mono text-slate-300 truncate">
-                          {link}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-slate-500">Nenhum link de checkout encontrado</p>
-                    )}
-                  </div>
-                </div>
-              </>
             )}
-          </div>
+          </section>
+        )}
 
-          {/* Right: Editor */}
-          <div className="lg:col-span-2 space-y-4">
-            <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-              Personalizar Funil
-            </h2>
-
-            {/* Checkout section */}
-            <div className="glass-panel rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <ShoppingCart className="w-3.5 h-3.5 text-green-400" />
-                </div>
-                <h3 className="font-semibold text-white">Link de Checkout</h3>
-                <span className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full">Obrigatório</span>
-              </div>
+        {/* Step 3: Preview + ZIP */}
+        {cloneData && (
+          <section className="glass-panel rounded-2xl p-6">
+            <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
               <div>
-                <label className="block text-sm text-slate-400 mb-1.5">
-                  Substitua pelo seu link de checkout
-                </label>
-                <input
-                  type="url"
-                  value={checkoutUrl}
-                  onChange={(e) => setCheckoutUrl(e.target.value)}
-                  placeholder="https://pay.hotmart.com/seu-produto"
-                  className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition font-mono text-sm"
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <PackageOpen className="w-5 h-5 text-green-400" />
+                  Clone gerado
+                </h2>
+                <p className="text-sm text-slate-400 mt-1">
+                  {cloneData.stats.successAssets} de {cloneData.stats.totalAssets} assets ·{' '}
+                  {(cloneData.stats.totalBytes / 1024 / 1024).toFixed(2)} MB ·{' '}
+                  clonado em {new Date(cloneData.clonedAt).toLocaleString('pt-BR')}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleClone}
+                  disabled={cloning}
+                  className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 text-sm font-medium px-3 py-2 rounded-lg transition border border-slate-700"
+                >
+                  {cloning ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" />Re-clonando…</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4" />Re-clonar</>
+                  )}
+                </button>
+                {cloneData.zipUrl && (
+                  <a
+                    href={cloneData.zipUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download ZIP
+                  </a>
+                )}
+                {cloneData.previewUrl && (
+                  <a
+                    href={cloneData.previewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+                  >
+                    <Globe className="w-4 h-4" />
+                    Abrir preview
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {cloneData.warnings && cloneData.warnings.length > 0 && (
+              <div className="mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-4 py-3 text-yellow-400 text-sm">
+                <p className="font-medium mb-1">Avisos do clone:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-xs">
+                  {cloneData.warnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {cloneData.previewUrl && (
+              <div className="rounded-xl overflow-hidden border border-slate-700 bg-black">
+                <div className="bg-slate-900 px-3 py-2 flex items-center gap-2 text-xs text-slate-400 border-b border-slate-700">
+                  <Eye className="w-3.5 h-3.5" />
+                  Preview funcional (iframe servido a partir do Storage)
+                </div>
+                <iframe
+                  src={cloneData.previewUrl}
+                  className="w-full h-[600px] bg-white"
+                  title="Preview do clone"
+                  sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
                 />
-                {checkout?.primaryLink && (
-                  <p className="text-xs text-slate-500 mt-1.5">
-                    Original: <span className="font-mono">{checkout.primaryLink}</span>
-                  </p>
-                )}
               </div>
-            </div>
+            )}
 
-            {/* Tracking section */}
-            <div className="glass-panel rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <Tag className="w-3.5 h-3.5 text-blue-400" />
-                </div>
-                <h3 className="font-semibold text-white">Pixels de Rastreamento</h3>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">
-                  Facebook Pixel ID
-                </label>
-                <input
-                  type="text"
-                  value={facebookPixelId}
-                  onChange={(e) => setFacebookPixelId(e.target.value)}
-                  placeholder="Ex: 1234567890123456"
-                  className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono text-sm"
-                />
-                {tracking?.facebookPixelId && (
-                  <p className="text-xs text-slate-500 mt-1.5">
-                    Original: <span className="font-mono">{tracking.facebookPixelId}</span>
-                  </p>
-                )}
+            {/* Tabela de assets */}
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">Assets baixados</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {countByType(cloneData).map(({ type, count, ok, fail }) => (
+                  <div key={type} className="bg-slate-900/50 border border-slate-800 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
+                      {iconForType(type)}
+                      <span className="capitalize">{type}</span>
+                    </div>
+                    <p className="text-xl font-semibold text-white">{count}</p>
+                    <p className="text-xs text-slate-500">
+                      <span className="text-green-400">{ok} ok</span>
+                      {fail > 0 && <> · <span className="text-red-400">{fail} fail</span></>}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
+          </section>
+        )}
 
-            {/* Texts section */}
-            <div className="glass-panel rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                  <Zap className="w-3.5 h-3.5 text-purple-400" />
-                </div>
-                <h3 className="font-semibold text-white">Textos da Página</h3>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1.5">Título / Headline</label>
-                  <input
-                    type="text"
-                    value={headlineText}
-                    onChange={(e) => setHeadlineText(e.target.value)}
-                    placeholder="Título principal da página"
-                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1.5">Subtítulo / Subheadline</label>
-                  <textarea
-                    value={subheadlineText}
-                    onChange={(e) => setSubheadlineText(e.target.value)}
-                    placeholder="Descrição ou subtítulo"
-                    rows={3}
-                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1.5">Texto do Botão CTA</label>
-                  <input
-                    type="text"
-                    value={ctaButtonText}
-                    onChange={(e) => setCtaButtonText(e.target.value)}
-                    placeholder="Ex: QUERO COMPRAR AGORA"
-                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Source URL info */}
-            <div className="glass-panel rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <ExternalLink className="w-4 h-4 text-slate-400" />
-                <h3 className="text-sm font-semibold text-slate-300">URL de Origem</h3>
-              </div>
-              <a
-                href={project.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-400 hover:text-blue-300 transition font-mono break-all"
-              >
-                {project.source_url}
-              </a>
-            </div>
-
-            {/* Save button (bottom) */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saveSuccess ? 'Salvo com sucesso!' : 'Salvar alterações'}
-              </button>
-              <button
-                onClick={handlePublish}
-                disabled={publishing || !extracted}
-                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all duration-200"
-              >
-                {publishing ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Publicando...</>
-                ) : (
-                  <><Globe className="w-4 h-4" />Publicar Funil</>
-                )}
-              </button>
-            </div>
+        {/* Cloning loading state */}
+        {cloning && !cloneData && (
+          <div className="glass-panel rounded-2xl p-8 text-center">
+            <Loader2 className="w-10 h-10 text-blue-400 animate-spin mx-auto mb-3" />
+            <p className="text-white font-medium">Clonando todos os assets…</p>
+            <p className="text-slate-400 text-sm mt-1">
+              Baixando JS, CSS, imagens, áudios e vídeos. Pode levar até 60 segundos.
+            </p>
           </div>
-        </div>
+        )}
       </main>
+
+      {showLocalGuide && (
+        <LocalEngineGuide
+          projectId={projectId}
+          onClose={() => setShowLocalGuide(false)}
+        />
+      )}
     </div>
   );
 }
 
-function InfoRow({
-  label,
-  value,
-  mono = false,
-  highlight = false,
+// ─── Sub-componentes ────────────────────────────────────────────────────────
+
+function StepCard({
+  stepNum,
+  title,
+  description,
+  done,
+  active,
+  icon,
 }: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  highlight?: boolean;
+  stepNum: number;
+  title: string;
+  description: string;
+  done: boolean;
+  active: boolean;
+  icon: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-2">
-      <span className="text-slate-500 flex-shrink-0">{label}:</span>
-      <span
-        className={`text-right break-all ${
-          mono ? 'font-mono text-slate-300' : ''
-        } ${highlight ? 'text-purple-400 font-medium capitalize' : 'text-slate-300'}`}
-      >
-        {value}
-      </span>
+    <div
+      className={`glass-panel rounded-xl p-4 border ${
+        done
+          ? 'border-green-500/40 bg-green-500/5'
+          : active
+          ? 'border-blue-500/40 bg-blue-500/5'
+          : 'border-slate-800'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+            done
+              ? 'bg-green-500/20 text-green-400'
+              : active
+              ? 'bg-blue-500/20 text-blue-400'
+              : 'bg-slate-800 text-slate-500'
+          }`}
+        >
+          {done ? <CheckCircle2 className="w-5 h-5" /> : icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-slate-500">Passo {stepNum}</p>
+          <h3 className="font-semibold text-white text-sm">{title}</h3>
+          <p className="text-xs text-slate-400 mt-0.5">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnalysisReport({ result }: { result: AnalysisResult }) {
+  const { data, assets } = result;
+  const player = data.player;
+  const tracking = data.tracking;
+  const checkout = data.checkout;
+  const page = data.page;
+
+  return (
+    <div className="space-y-4 mt-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+          <p className="text-xs text-slate-500 mb-1">Título da página</p>
+          <p className="text-sm text-white font-medium">{page.title || '—'}</p>
+          {page.description && (
+            <p className="text-xs text-slate-400 mt-2 line-clamp-2">{page.description}</p>
+          )}
+        </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+          <p className="text-xs text-slate-500 mb-1">Player de vídeo</p>
+          <p className="text-sm text-white font-medium capitalize">{player?.type || 'não detectado'}</p>
+          {player?.videoId && (
+            <p className="text-xs text-slate-400 mt-1 font-mono">video: {player.videoId}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <AssetTile icon={<FileCode className="w-4 h-4" />} label="Scripts" count={assets.scripts.length} />
+        <AssetTile icon={<Type className="w-4 h-4" />} label="CSS" count={assets.stylesheets.length} />
+        <AssetTile icon={<ImageIcon className="w-4 h-4" />} label="Imagens" count={assets.images.length} />
+        <AssetTile icon={<FileVideo className="w-4 h-4" />} label="m3u8" count={assets.m3u8Urls.length} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <InfoLine label="Facebook Pixel" value={tracking.facebookPixelId || '—'} />
+        <InfoLine label="Google Analytics" value={tracking.googleAnalyticsId || '—'} />
+        <InfoLine label="UTMify" value={tracking.utmify ? 'detectado' : '—'} />
+        <InfoLine label="Checkout" value={checkout.primaryLink || '—'} />
+      </div>
+    </div>
+  );
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-900/40 rounded-lg">
+      <span className="text-xs text-slate-500 flex-shrink-0">{label}</span>
+      <span className="text-xs text-slate-300 font-mono truncate">{value}</span>
+    </div>
+  );
+}
+
+function AssetTile({
+  icon,
+  label,
+  count,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+}) {
+  return (
+    <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-3">
+      <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-1">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <p className="text-xl font-semibold text-white">{count}</p>
+    </div>
+  );
+}
+
+function countByType(cd: CloneData) {
+  const map = new Map<string, { count: number; ok: number; fail: number }>();
+  for (const a of cd.assets) {
+    const cur = map.get(a.type) || { count: 0, ok: 0, fail: 0 };
+    cur.count++;
+    if (a.ok) cur.ok++;
+    else cur.fail++;
+    map.set(a.type, cur);
+  }
+  return Array.from(map.entries()).map(([type, v]) => ({ type, ...v }));
+}
+
+function iconForType(t: string) {
+  switch (t) {
+    case 'image':
+      return <ImageIcon className="w-3.5 h-3.5" />;
+    case 'video':
+      return <FileVideo className="w-3.5 h-3.5" />;
+    case 'audio':
+      return <FileAudio className="w-3.5 h-3.5" />;
+    case 'script':
+      return <FileCode className="w-3.5 h-3.5" />;
+    case 'stylesheet':
+      return <Type className="w-3.5 h-3.5" />;
+    case 'font':
+      return <Type className="w-3.5 h-3.5" />;
+    default:
+      return <Cloud className="w-3.5 h-3.5" />;
+  }
+}
+
+function LocalEngineGuide({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const [token, setToken] = useState<string>('');
+  useEffect(() => {
+    // Tenta ler o token da sessão Supabase
+    import('@/lib/supabase').then(({ supabase }) => {
+      supabase.auth.getSession().then(({ data }) => {
+        setToken(data.session?.access_token || '');
+      });
+    });
+  }, []);
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://oishenwcfeyucmtmysaa.supabase.co';
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '<NEXT_PUBLIC_SUPABASE_ANON_KEY>';
+
+  const cmd = `node clone-local.mjs <URL_DO_FUNIL> out/clone \\
+  --upload \\
+  --project-id=${projectId} \\
+  --supabase-url=${supabaseUrl} \\
+  --supabase-anon-key=${anonKey} \\
+  --user-token=${token || '<seu-access_token>'}`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-2xl glass-panel rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-orange-400" />
+            Motor local (Puppeteer full)
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="space-y-4 text-sm text-slate-300">
+          <p>
+            Para sites com <strong>Cloudflare</strong> ou SPAs pesadas, o motor da Vercel
+            não consegue clonar tudo dentro do limite de 60 segundos. Use o motor local
+            no seu próprio computador (precisa Node.js 18+).
+          </p>
+          <ol className="list-decimal list-inside space-y-2 pl-2">
+            <li>
+              Clone este repositório:{' '}
+              <code className="bg-slate-800 px-1.5 py-0.5 rounded text-xs">
+                git clone https://github.com/royalmaxDR/vsl-cloner
+              </code>
+            </li>
+            <li>
+              Entre na pasta:{' '}
+              <code className="bg-slate-800 px-1.5 py-0.5 rounded text-xs">cd vsl-cloner/local-engine</code>
+            </li>
+            <li>
+              Instale (uma única vez, ~170 MB):{' '}
+              <code className="bg-slate-800 px-1.5 py-0.5 rounded text-xs">npm install</code>
+            </li>
+            <li>
+              Execute o clonador (ele já sobe o resultado para o seu painel):
+            </li>
+          </ol>
+          <pre className="bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs text-slate-300 overflow-x-auto">
+            <code>{cmd}</code>
+          </pre>
+          <button
+            onClick={() => navigator.clipboard.writeText(cmd)}
+            className="text-xs text-blue-400 hover:text-blue-300"
+          >
+            Copiar comando
+          </button>
+          <p className="text-xs text-slate-500">
+            Quando terminar, clique em <strong>Recarregar</strong> nesta página para ver
+            o preview e o ZIP.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

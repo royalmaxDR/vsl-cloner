@@ -1,0 +1,17 @@
+{
+  "name": "vsl-cloner-local-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Motor local Puppeteer para clonar funis com Cloudflare/SPAs pesadas.",
+  "bin": {
+    "clone-local": "./clone-local.mjs"
+  },
+  "scripts": {
+    "clone": "node clone-local.mjs"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "puppeteer": "^23.11.1"
+  }
+}

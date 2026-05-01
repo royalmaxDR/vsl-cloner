@@ -1,26 +1,29 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { authFetch } from '@/lib/auth-fetch';
 import type { Project } from '@/lib/supabase';
 import StatusBadge from '@/components/StatusBadge';
-import NewProjectModal from '@/components/NewProjectModal';
+import NewCloneModal from '@/components/NewCloneModal';
 import {
   Plus,
   Zap,
   LogOut,
   Folder,
   ExternalLink,
-  Pencil,
   Trash2,
   Clock,
   Globe,
   BarChart3,
   RefreshCw,
+  Download,
+  Eye,
 } from 'lucide-react';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -32,6 +35,9 @@ export default function DashboardPage() {
     if (res.ok) {
       const data = await res.json();
       setProjects(data.projects || []);
+    } else if (res.status === 401) {
+      window.location.href = '/login';
+      return;
     }
     setLoading(false);
   }, []);
@@ -62,8 +68,7 @@ export default function DashboardPage() {
 
   function handleProjectCreated(projectId: string) {
     setShowModal(false);
-    fetchProjects();
-    window.location.href = `/editor/${projectId}`;
+    router.push(`/editor/${projectId}`);
   }
 
   const stats = {
@@ -74,13 +79,11 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#020617]">
-      {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-3xl" />
       </div>
 
-      {/* Header */}
       <header className="relative border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -104,12 +107,11 @@ export default function DashboardPage() {
       </header>
 
       <main className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page title + actions */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-white">Meus Projetos</h1>
+            <h1 className="text-2xl font-bold text-white">Meus Clones</h1>
             <p className="text-slate-400 text-sm mt-1">
-              Gerencie seus funis VSL clonados
+              Funis clonados — preview funcional e download ZIP
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -125,12 +127,11 @@ export default function DashboardPage() {
               className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/20"
             >
               <Plus className="w-4 h-4" />
-              Novo Projeto
+              Novo Clone
             </button>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           {[
             { label: 'Total', value: stats.total, icon: <Folder className="w-5 h-5 text-slate-400" />, color: 'border-slate-700' },
@@ -147,7 +148,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Projects list */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
@@ -163,16 +163,17 @@ export default function DashboardPage() {
             <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto mb-4">
               <Folder className="w-8 h-8 text-slate-500" />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Nenhum projeto ainda</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Nenhum clone ainda</h3>
             <p className="text-slate-400 mb-6 max-w-sm mx-auto">
-              Crie seu primeiro projeto colando a URL de uma página VSL para começar a clonar.
+              Crie seu primeiro clone colando a URL de um funil. O sistema baixa
+              HTML, JS, CSS, imagens, áudios e vídeos automaticamente.
             </p>
             <button
               onClick={() => setShowModal(true)}
               className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold px-5 py-2.5 rounded-xl transition-all duration-200"
             >
               <Plus className="w-4 h-4" />
-              Criar primeiro projeto
+              Criar primeiro clone
             </button>
           </div>
         ) : (
@@ -181,7 +182,7 @@ export default function DashboardPage() {
               <ProjectCard
                 key={project.id}
                 project={project}
-                onEdit={() => router.push(`/editor/${project.id}`)}
+                onOpen={() => router.push(`/editor/${project.id}`)}
                 onDelete={() => handleDelete(project.id)}
                 isDeleting={deletingId === project.id}
               />
@@ -191,7 +192,7 @@ export default function DashboardPage() {
       </main>
 
       {showModal && (
-        <NewProjectModal
+        <NewCloneModal
           onClose={() => setShowModal(false)}
           onCreated={handleProjectCreated}
         />
@@ -202,15 +203,18 @@ export default function DashboardPage() {
 
 function ProjectCard({
   project,
-  onEdit,
+  onOpen,
   onDelete,
   isDeleting,
 }: {
   project: Project;
-  onEdit: () => void;
+  onOpen: () => void;
   onDelete: () => void;
   isDeleting: boolean;
 }) {
+  const cloneData = project.clone_data as
+    | (Project['clone_data'] & { previewUrl?: string; zipUrl?: string })
+    | null;
   const playerType = (project.extracted_data as { player?: { type?: string } } | null)?.player?.type;
 
   return (
@@ -223,13 +227,18 @@ function ProjectCard({
         <StatusBadge status={project.status} />
       </div>
 
-      {playerType && playerType !== 'unknown' && (
-        <div className="flex items-center gap-1.5 mb-3">
+      <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+        {playerType && playerType !== 'unknown' && (
           <span className="text-xs bg-purple-500/15 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full capitalize">
             {playerType}
           </span>
-        </div>
-      )}
+        )}
+        {cloneData?.stats && (
+          <span className="text-xs bg-blue-500/15 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full">
+            {cloneData.stats.successAssets} assets
+          </span>
+        )}
+      </div>
 
       <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-4">
         <Clock className="w-3 h-3" />
@@ -238,19 +247,32 @@ function ProjectCard({
 
       <div className="mt-auto flex items-center gap-2">
         <button
-          onClick={onEdit}
+          onClick={onOpen}
           className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-sm font-medium py-2 rounded-lg transition"
         >
-          <Pencil className="w-3.5 h-3.5" />
-          Editar
+          <Eye className="w-3.5 h-3.5" />
+          Abrir
         </button>
 
-        {project.published_url && (
+        {cloneData?.zipUrl && (
           <a
-            href={project.published_url}
+            href={cloneData.zipUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-1.5 bg-green-500/15 hover:bg-green-500/25 text-green-400 text-sm font-medium py-2 px-3 rounded-lg transition border border-green-500/30"
+            title="Baixar ZIP"
+          >
+            <Download className="w-3.5 h-3.5" />
+          </a>
+        )}
+
+        {cloneData?.previewUrl && (
+          <a
+            href={cloneData.previewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-sm font-medium py-2 px-3 rounded-lg transition border border-blue-500/30"
+            title="Abrir preview"
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
