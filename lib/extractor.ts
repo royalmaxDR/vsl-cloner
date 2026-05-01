@@ -28,30 +28,120 @@ export interface ExtractionResult {
   metadata: Record<string, unknown>;
 }
 
+// ─── Browser-like headers ─────────────────────────────────────────────────────
+
+const BROWSER_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  Accept:
+    'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+  'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br',
+  Connection: 'keep-alive',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Cache-Control': 'max-age=0',
+  'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+};
+
+// ─── URL normalization ────────────────────────────────────────────────────────
+
+/**
+ * Remove parâmetros de rastreamento (fbclid, utm_*, gclid, etc.) da URL.
+ * Mantém parâmetros que fazem parte da lógica da página (ex: id=, v=, etc.)
+ */
+function removeTrackingParams(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const trackingParams = [
+      'fbclid', 'gclid', 'msclkid', 'twclid', 'ttclid',
+      'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+      'utm_id', 'utm_source_platform', 'utm_creative_format', 'utm_marketing_tactic',
+      '_ga', '_gl', 'mc_cid', 'mc_eid',
+    ];
+    trackingParams.forEach((p) => parsed.searchParams.delete(p));
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 // ─── Fetch helpers ────────────────────────────────────────────────────────────
 
-async function fetchPage(url: string): Promise<string> {
-  const normalizedUrl = url.startsWith('http') ? url : `https://${url}`;
-
-  const response = await fetch(normalizedUrl, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept:
-        'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-      Referer: 'https://www.google.com/',
-      'Cache-Control': 'no-cache',
-    },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(20000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+async function fetchWithHeaders(url: string, referer?: string): Promise<Response> {
+  const headers: Record<string, string> = { ...BROWSER_HEADERS };
+  if (referer) {
+    headers['Referer'] = referer;
+    headers['Sec-Fetch-Site'] = 'same-origin';
+  } else {
+    headers['Referer'] = 'https://www.google.com.br/';
   }
 
-  return response.text();
+  return fetch(url, {
+    headers,
+    redirect: 'follow',
+    signal: AbortSignal.timeout(25000),
+  });
+}
+
+async function fetchPage(url: string): Promise<{ html: string; finalUrl: string }> {
+  const normalizedUrl = url.startsWith('http') ? url : `https://${url}`;
+
+  // Attempt 1: URL original com headers de browser
+  let response = await fetchWithHeaders(normalizedUrl);
+
+  // Attempt 2: URL sem parâmetros de rastreamento (fbclid, utm_*, etc.)
+  if (!response.ok && response.status === 403) {
+    const cleanUrl = removeTrackingParams(normalizedUrl);
+    if (cleanUrl !== normalizedUrl) {
+      console.log(`[extractor] 403 com URL original, tentando sem tracking params: ${cleanUrl}`);
+      response = await fetchWithHeaders(cleanUrl);
+    }
+  }
+
+  // Attempt 3: URL sem NENHUM query param
+  if (!response.ok && (response.status === 403 || response.status === 429)) {
+    try {
+      const parsed = new URL(normalizedUrl);
+      const bareUrl = `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+      if (bareUrl !== normalizedUrl) {
+        console.log(`[extractor] Ainda ${response.status}, tentando URL base: ${bareUrl}`);
+        response = await fetchWithHeaders(bareUrl, parsed.origin);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!response.ok) {
+    const status = response.status;
+    if (status === 403) {
+      throw new Error(
+        `HTTP 403: Este site bloqueia acesso direto (proteção anti-bot). ` +
+        `Tente usar a URL sem parâmetros de rastreamento (remova ?fbclid=... e similares) ` +
+        `ou tente outra página do mesmo funil.`
+      );
+    }
+    if (status === 404) {
+      throw new Error(`HTTP 404: Página não encontrada. Verifique se a URL está correta.`);
+    }
+    if (status === 429) {
+      throw new Error(`HTTP 429: Muitas requisições. Aguarde alguns minutos e tente novamente.`);
+    }
+    if (status === 500 || status === 502 || status === 503) {
+      throw new Error(`HTTP ${status}: O servidor da página está com problemas. Tente novamente mais tarde.`);
+    }
+    throw new Error(`HTTP ${status}: ${response.statusText}`);
+  }
+
+  const html = await response.text();
+  const finalUrl = response.url || normalizedUrl;
+  return { html, finalUrl };
 }
 
 // ─── Player detection ─────────────────────────────────────────────────────────
@@ -77,26 +167,22 @@ function detectPlayer(html: string): PlayerData {
   if (convertAiPatterns.some((p) => p.test(html))) {
     result.type = 'convertai';
 
-    // Organization ID
     const orgMatch =
       html.match(/organization[_-]?id['":\s]+['"]?([a-zA-Z0-9_-]+)/i) ||
       html.match(/org[_-]?id['":\s]+['"]?([a-zA-Z0-9_-]+)/i) ||
       html.match(/convertai\.com\.br\/([a-zA-Z0-9_-]+)\//i);
     if (orgMatch) result.organizationId = orgMatch[1];
 
-    // Player ID
     const playerMatch =
       html.match(/player[_-]?id['":\s]+['"]?([a-zA-Z0-9_-]+)/i) ||
       html.match(/data-player['":\s]+['"]?([a-zA-Z0-9_-]+)/i);
     if (playerMatch) result.playerId = playerMatch[1];
 
-    // Video ID
     const videoMatch =
       html.match(/video[_-]?id['":\s]+['"]?([a-zA-Z0-9_-]+)/i) ||
       html.match(/data-video['":\s]+['"]?([a-zA-Z0-9_-]+)/i);
     if (videoMatch) result.videoId = videoMatch[1];
 
-    // Script src
     const scriptMatch = html.match(
       /src=['"]([^'"]*convertai[^'"]*\.js[^'"]*)['"]/i
     );
@@ -150,19 +236,16 @@ function detectPlayer(html: string): PlayerData {
 function extractM3u8Urls(html: string): string[] {
   const urls = new Set<string>();
 
-  // Direct .m3u8 URLs in src/href attributes
   const directMatches = html.matchAll(/['"]([^'"]*\.m3u8[^'"]*)['"]/gi);
   for (const match of directMatches) {
     urls.add(match[1]);
   }
 
-  // JSON-encoded .m3u8 URLs
   const jsonMatches = html.matchAll(/\\u0022([^\\]*\.m3u8[^\\]*)\\u0022/gi);
   for (const match of jsonMatches) {
     urls.add(match[1]);
   }
 
-  // URL-encoded .m3u8
   const encodedMatches = html.matchAll(/(['"])(https?%3A[^'"]*\.m3u8[^'"]*)\1/gi);
   for (const match of encodedMatches) {
     try {
@@ -205,7 +288,6 @@ function extractTracking(html: string): TrackingData {
     rawScripts: [],
   };
 
-  // Facebook Pixel
   const fbPatterns = [
     /fbq\s*\(\s*['"]init['"]\s*,\s*['"](\d{10,20})['"]/i,
     /facebook[_-]?pixel[_-]?id['":\s]+['"]?(\d{10,20})/i,
@@ -219,17 +301,13 @@ function extractTracking(html: string): TrackingData {
     }
   }
 
-  // UTMify
   if (/utmify\.com\.br|utmify/i.test(html)) {
     result.utmify = true;
   }
 
-  // Google Analytics
   const gaPatterns = [
     /gtag\s*\(\s*['"]config['"]\s*,\s*['"]([GUA]-[A-Z0-9-]+)['"]/i,
     /ga\s*\(\s*['"]create['"]\s*,\s*['"]([UA]-\d+-\d+)['"]/i,
-    /google-analytics\.com\/analytics\.js/i,
-    /_ga\s*=\s*['"]([^'"]+)['"]/i,
     /G-[A-Z0-9]{8,}/,
   ];
   for (const pattern of gaPatterns) {
@@ -245,7 +323,6 @@ function extractTracking(html: string): TrackingData {
     }
   }
 
-  // Collect raw script tags for reference
   const scriptMatches = html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
   for (const match of scriptMatches) {
     const content = match[1].trim();
@@ -272,7 +349,6 @@ function extractCta(html: string): CtaData {
     buttons: [],
   };
 
-  // Delay patterns
   const delayPatterns = [
     { regex: /scrollToActionIn\s*[=:]\s*(\d+)/i, param: 'scrollToActionIn' },
     { regex: /ctaDelay\s*[=:]\s*(\d+)/i, param: 'ctaDelay' },
@@ -291,7 +367,6 @@ function extractCta(html: string): CtaData {
     }
   }
 
-  // CTA buttons — look for checkout/buy buttons
   const buttonPatterns = [
     /<a[^>]*href=['"]([^'"]*(?:checkout|comprar|buy|pedido|order|pay|pagar|oferta)[^'"]*)['"]/gi,
     /<button[^>]*onclick=['"][^'"]*(?:checkout|comprar|buy)[^'"]*['"]/gi,
@@ -302,7 +377,6 @@ function extractCta(html: string): CtaData {
     const matches = html.matchAll(pattern);
     for (const match of matches) {
       if (match[1]) {
-        // Extract button text
         const buttonHtml = html.substring(
           Math.max(0, html.indexOf(match[0])),
           html.indexOf(match[0]) + 500
@@ -351,14 +425,13 @@ function extractCheckout(html: string): CheckoutData {
 
 function extractPageData(html: string): PageData {
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const descMatch = html.match(
-    /<meta[^>]*name=['"]description['"][^>]*content=['"]([^'"]+)['"]/i
-  ) || html.match(/<meta[^>]*content=['"]([^'"]+)['"][^>]*name=['"]description['"]/i);
-  const ogImageMatch = html.match(
-    /<meta[^>]*property=['"]og:image['"][^>]*content=['"]([^'"]+)['"]/i
-  ) || html.match(/<meta[^>]*content=['"]([^'"]+)['"][^>]*property=['"]og:image['"]/i);
+  const descMatch =
+    html.match(/<meta[^>]*name=['"]description['"][^>]*content=['"]([^'"]+)['"]/i) ||
+    html.match(/<meta[^>]*content=['"]([^'"]+)['"][^>]*name=['"]description['"]/i);
+  const ogImageMatch =
+    html.match(/<meta[^>]*property=['"]og:image['"][^>]*content=['"]([^'"]+)['"]/i) ||
+    html.match(/<meta[^>]*content=['"]([^'"]+)['"][^>]*property=['"]og:image['"]/i);
 
-  // Extract head content
   const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
 
@@ -405,7 +478,7 @@ function extractAssets(html: string): ExtractedAssets {
 // ─── Main extractor ───────────────────────────────────────────────────────────
 
 export async function extractVSL(url: string): Promise<ExtractionResult> {
-  const rawHtml = await fetchPage(url);
+  const { html: rawHtml, finalUrl } = await fetchPage(url);
 
   const player = detectPlayer(rawHtml);
   const m3u8Urls = extractM3u8Urls(rawHtml);
@@ -429,6 +502,7 @@ export async function extractVSL(url: string): Promise<ExtractionResult> {
   const metadata: Record<string, unknown> = {
     extractedAt: new Date().toISOString(),
     sourceUrl: url,
+    finalUrl,
     htmlLength: rawHtml.length,
     playerDetected: player.type,
     m3u8Count: m3u8Urls.length,

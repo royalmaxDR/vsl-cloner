@@ -29,7 +29,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'URL inválida. Verifique o formato.' }, { status: 400 });
     }
 
-    const result = await extractVSL(normalizedUrl);
+    let result;
+    try {
+      result = await extractVSL(normalizedUrl);
+    } catch (extractError) {
+      const message = extractError instanceof Error ? extractError.message : 'Erro desconhecido na extração';
+
+      // Se o projeto foi criado mas a extração falhou, atualiza status para 'erro'
+      if (projectId) {
+        const supabase = createSupabaseAdminClient();
+        await supabase
+          .from('projects')
+          .update({ status: 'pronto' }) // mantém como pronto para o usuário poder tentar de novo
+          .eq('id', projectId)
+          .eq('user_id', user.id);
+      }
+
+      // Retorna erro com mensagem específica e status HTTP adequado
+      if (message.includes('HTTP 403') || message.includes('bloqueia')) {
+        return NextResponse.json({ error: message }, { status: 403 });
+      }
+      if (message.includes('HTTP 404') || message.includes('não encontrada')) {
+        return NextResponse.json({ error: message }, { status: 404 });
+      }
+      if (message.includes('HTTP 429') || message.includes('Muitas requisições')) {
+        return NextResponse.json({ error: message }, { status: 429 });
+      }
+      if (message.includes('timeout') || message.includes('abort') || message.includes('demorou')) {
+        return NextResponse.json(
+          { error: 'A página demorou muito para responder. Tente novamente.' },
+          { status: 408 }
+        );
+      }
+
+      return NextResponse.json({ error: message }, { status: 422 });
+    }
 
     if (projectId) {
       const supabase = createSupabaseAdminClient();
@@ -58,25 +92,8 @@ export async function POST(request: NextRequest) {
       metadata: result.metadata,
     });
   } catch (error) {
-    console.error('[/api/extract] Error:', error);
+    console.error('[/api/extract] Unexpected error:', error);
     const message = error instanceof Error ? error.message : 'Erro desconhecido';
-
-    if (message.includes('HTTP 4')) {
-      return NextResponse.json(
-        { error: `A página retornou um erro: ${message}` },
-        { status: 422 }
-      );
-    }
-    if (message.includes('timeout') || message.includes('abort')) {
-      return NextResponse.json(
-        { error: 'A página demorou muito para responder. Tente novamente.' },
-        { status: 408 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: `Falha na extração: ${message}` },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: `Erro interno: ${message}` }, { status: 500 });
   }
 }
