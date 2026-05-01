@@ -1,42 +1,81 @@
-# Guia de Deploy e Configuração (Vercel + Supabase)
+# VSL Cloner — Deploy Guide
 
-Este guia explica como configurar o ambiente para produção.
+## Stack
+- **Framework**: Next.js 15 (App Router)
+- **Database + Auth**: Supabase (PostgreSQL)
+- **Hosting**: Vercel
+- **Styling**: Tailwind CSS 4
 
-## 1. Configuração do Supabase
+---
 
-1.  Crie um projeto no [Supabase](https://supabase.com/).
-2.  Vá para o **SQL Editor** no painel do Supabase.
-3.  Copie o conteúdo do arquivo `supabase/schema.sql` deste projeto.
-4.  Cole no SQL Editor e execute (Run). Isso criará todas as tabelas e políticas de segurança necessárias.
+## 1. Supabase Setup
 
-## 2. Variáveis de Ambiente
+1. Create a project at https://supabase.com
+2. Go to **SQL Editor** and run `supabase/schema.sql`
+3. In **Authentication → Settings**, enable Email/Password sign-in
+4. Copy your credentials from **Project Settings → API**:
+   - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
+   - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` (keep secret!)
 
-Você precisa configurar as seguintes variáveis de ambiente no seu projeto local (`.env.local`) e na Vercel.
+---
+
+## 2. Environment Variables
+
+Set these in Vercel (or `.env.local` for local dev):
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=Sua_URL_do_Supabase
-NEXT_PUBLIC_SUPABASE_ANON_KEY=Sua_Chave_Anonima_do_Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+NEXT_PUBLIC_APP_URL=https://your-vercel-domain.vercel.app
 ```
 
-Para encontrar essas chaves no Supabase:
--   Vá em **Project Settings** > **API**.
+---
 
-## 3. Deploy na Vercel
+## 3. Vercel Deploy
 
-1.  Crie uma conta na [Vercel](https://vercel.com/).
-2.  Importe o repositório do GitHub.
-3.  Na configuração do projeto, adicione as variáveis de ambiente acima (`NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
-4.  Clique em **Deploy**.
+Connect the GitHub repo `royalmaxDR/Next-Enterprise` to Vercel for automatic deploys on push.
 
-## 4. Populando o Banco de Dados (Jobs)
-
-O arquivo `supabase/schema.sql` cria a estrutura, mas o banco começa vazio de vagas.
-Para popular com as 1000 vagas geradas, você pode criar um script de seed ou inserir manualmente via SQL Editor.
-
-Exemplo de inserção manual (SQL):
-```sql
-INSERT INTO public.jobs (id, category, type, company, title, value, duration, description)
-VALUES ('JOB-TEST-001', 'Iniciante', 'ad', 'TikTok', 'Teste', 50.00, '15 min', 'Descrição...');
+Or via CLI:
+```bash
+npm i -g vercel
+vercel --prod
 ```
 
-Para produção real, recomenda-se criar um script Node.js que leia o `data/jobs.ts` e insira no Supabase usando a biblioteca `@supabase/supabase-js`.
+---
+
+## 4. Local Development
+
+```bash
+npm install
+cp .env.example .env.local
+# Fill in your Supabase credentials in .env.local
+npm run dev
+```
+
+---
+
+## Database Schema
+
+### `public.projects`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| user_id | uuid | References auth.users |
+| name | text | Project name |
+| source_url | text | Original VSL URL |
+| status | text | `extraindo` \| `pronto` \| `publicado` |
+| extracted_data | jsonb | Full extraction result |
+| customizations | jsonb | User's edits |
+| published_url | text | Public URL after publish |
+| slug | text | URL slug for /p/[slug] |
+
+### `public.extractions`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| project_id | uuid | References projects |
+| raw_html | text | Original page HTML |
+| assets | jsonb | Extracted assets inventory |
+| metadata | jsonb | Extraction metadata |

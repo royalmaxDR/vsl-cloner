@@ -1,137 +1,86 @@
--- Enable UUID extension for generating unique IDs
-create extension if not exists "uuid-ossp";
+-- VSL Cloner — Supabase Schema
+-- Run this in the Supabase SQL Editor to set up the database
 
--- 1. PROFILES TABLE
--- Extends the default Supabase auth.users table
-create table public.profiles (
-  id uuid references auth.users not null primary key,
-  email text,
-  full_name text,
-  avatar_url text,
-  level text default 'Iniciante',
-  is_premium boolean default false,
-  is_verified boolean default false,
-  tasks_today integer default 0,
-  tasks_completed_total integer default 0,
-  pix_key text,
-  is_community_member boolean default false,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+-- ─── Projects table ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.projects (
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name            text NOT NULL,
+  source_url      text NOT NULL,
+  status          text NOT NULL DEFAULT 'extraindo'
+                  CHECK (status IN ('extraindo', 'pronto', 'publicado')),
+  extracted_data  jsonb,
+  customizations  jsonb,
+  published_url   text,
+  slug            text UNIQUE,
+  created_at      timestamptz DEFAULT now() NOT NULL,
+  updated_at      timestamptz DEFAULT now() NOT NULL
 );
 
--- 2. JOBS TABLE
--- Stores available missions/tasks
-create table public.jobs (
-  id text primary key, -- Using text ID from the generator (e.g., JOB-AUDIT-1001)
-  category text not null,
-  type text not null,
-  company text not null,
-  title text not null,
-  value numeric(10,2) not null,
-  logo_url text,
-  level_required integer default 1,
-  currency text default 'BRL',
-  duration text,
-  description text,
-  briefing jsonb, -- Stores the briefing object structure
-  steps jsonb, -- Stores the steps array
-  evidence_config jsonb, -- Stores evidence requirements
-  job_data jsonb, -- Stores specific job data (transactions, videos, etc.)
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+-- ─── Extractions table ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.extractions (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id  uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  raw_html    text,
+  assets      jsonb,
+  metadata    jsonb,
+  created_at  timestamptz DEFAULT now() NOT NULL
 );
 
--- 3. USER_JOBS TABLE
--- Tracks user progress and completion of jobs
-create table public.user_jobs (
-  id uuid default uuid_generate_v4() primary key,
-  user_id uuid references public.profiles(id) not null,
-  job_id text references public.jobs(id) not null,
-  status text check (status in ('completed', 'failed', 'in_progress')) not null,
-  earnings numeric(10,2) not null,
-  completed_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  evidence_submitted text, -- The text report submitted by user
-  quality_score integer -- The score achieved
-);
+-- ─── Row Level Security ───────────────────────────────────────────────────────
+ALTER TABLE public.projects    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.extractions ENABLE ROW LEVEL SECURITY;
 
--- 4. WALLET_TRANSACTIONS TABLE
--- Financial history
-create table public.wallet_transactions (
-  id uuid default uuid_generate_v4() primary key,
-  user_id uuid references public.profiles(id) not null,
-  amount numeric(10,2) not null,
-  type text check (type in ('earning', 'withdrawal', 'bonus')) not null,
-  status text check (status in ('available', 'analysis', 'pending', 'paid')) default 'analysis',
-  description text,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
+-- Projects policies
+CREATE POLICY "Users can view own projects"
+  ON public.projects FOR SELECT
+  USING (auth.uid() = user_id);
 
--- 5. ACADEMY_PROGRESS TABLE
--- Tracks completed courses
-create table public.academy_progress (
-  id uuid default uuid_generate_v4() primary key,
-  user_id uuid references public.profiles(id) not null,
-  module_id text not null,
-  completed_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  unique(user_id, module_id)
-);
+CREATE POLICY "Public can view published projects"
+  ON public.projects FOR SELECT
+  USING (status = 'publicado');
 
--- ROW LEVEL SECURITY (RLS) POLICIES
--- Enable RLS on all tables
-alter table public.profiles enable row level security;
-alter table public.jobs enable row level security;
-alter table public.user_jobs enable row level security;
-alter table public.wallet_transactions enable row level security;
-alter table public.academy_progress enable row level security;
+CREATE POLICY "Users can insert own projects"
+  ON public.projects FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
--- PROFILES POLICIES
-create policy "Users can view own profile" on public.profiles
-  for select using (auth.uid() = id);
+CREATE POLICY "Users can update own projects"
+  ON public.projects FOR UPDATE
+  USING (auth.uid() = user_id);
 
-create policy "Users can update own profile" on public.profiles
-  for update using (auth.uid() = id);
+CREATE POLICY "Users can delete own projects"
+  ON public.projects FOR DELETE
+  USING (auth.uid() = user_id);
 
--- JOBS POLICIES
-create policy "Jobs are viewable by everyone" on public.jobs
-  for select using (true);
+-- Extractions policies
+CREATE POLICY "Users can view own extractions"
+  ON public.extractions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = project_id AND p.user_id = auth.uid()
+    )
+  );
 
--- USER_JOBS POLICIES
-create policy "Users can view own job history" on public.user_jobs
-  for select using (auth.uid() = user_id);
+CREATE POLICY "Users can insert own extractions"
+  ON public.extractions FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = project_id AND p.user_id = auth.uid()
+    )
+  );
 
-create policy "Users can insert own job completion" on public.user_jobs
-  for insert with check (auth.uid() = user_id);
+-- ─── Auto-update trigger ─────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- WALLET POLICIES
-create policy "Users can view own wallet" on public.wallet_transactions
-  for select using (auth.uid() = user_id);
-
--- ACADEMY POLICIES
-create policy "Users can view own academy progress" on public.academy_progress
-  for select using (auth.uid() = user_id);
-
-create policy "Users can insert own academy progress" on public.academy_progress
-  for insert with check (auth.uid() = user_id);
-
--- TRIGGERS AND FUNCTIONS
-
--- Function to handle new user creation automatically
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email, full_name, avatar_url)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'avatar_url');
-  return new;
-end;
-$$ language plpgsql security definer;
-
--- Trigger to call the function on auth.users insert
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-
--- SEED DATA EXAMPLE (Optional - Run this to add initial jobs manually if not using the generator script)
-/*
-insert into public.jobs (id, category, type, company, title, value, level_required, currency, duration, description, briefing, steps, evidence_config, job_data)
-values 
-('JOB-TEST-001', 'Iniciante', 'ad', 'TikTok', 'Teste de Moderação', 50.00, 1, 'BRL', '15 min', 'Descrição teste', '{}', '[]', '{}', '{}');
-*/
+DROP TRIGGER IF EXISTS set_updated_at ON public.projects;
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON public.projects
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();

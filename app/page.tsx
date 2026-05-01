@@ -1,442 +1,187 @@
-'use client';
+import Link from 'next/link';
+import { Zap, Video, Tag, Globe, ArrowRight, CheckCircle, Shield, Clock } from 'lucide-react';
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Home, Wallet, User as UserIcon, HelpCircle, Bell, Users, BookOpen, Briefcase } from 'lucide-react';
-
-import LoginView from '@/components/LoginView';
-import OnboardingView from '@/components/OnboardingView';
-import DashboardView from '@/components/DashboardView';
-import WalletView from '@/components/WalletView';
-import ProfileView from '@/components/ProfileView';
-import SupportView from '@/components/SupportView';
-import CommunityView from '@/components/CommunityView';
-import AcademyView from '@/components/AcademyView';
-import MyJobsView from '@/components/MyJobsView';
-import TaskSimulator from '@/components/TaskSimulator';
-import UpsellModal from '@/components/UpsellModal';
-import ToastNotification from '@/components/ToastNotification';
-import PWAInstallPrompt from '@/components/PWAInstallPrompt';
-
-export type UserProfile = {
-  name: string;
-  email: string;
-  age: string;
-  gender: string;
-  experience: string;
-  pixKey: string | null;
-  level: 'Nacional Bronze' | 'Nacional Prata' | 'Nacional Ouro' | 'Global';
-  tasksCompleted: number;
-  tasksToday: number;
-  lastTaskDate: string;
-  isVerified: boolean;
-  isPremium: boolean;
-  isCommunityMember: boolean;
-  createdAt: number;
-  avatar?: string;
-  completedModules: string[];
-  history: { date: string, amount: number }[];
-};
-
-export type Mission = {
-  id: string;
-  category: string;
-  type: 'ad' | 'chat' | 'qa' | 'input' | 'logic' | 'image' | 'dollar' | 'euro' | 'audit' | 'training' | 'transcription' | 'support' | 'video' | 'logistics';
-  company: string;
-  title: string;
-  value: number;
-  logo: string;
-  completed: boolean;
-  level: 1 | 2 | 3 | 4;
-  currency: 'BRL' | 'USD' | 'EUR';
-  duration: 'Rápido' | 'Médio' | 'Longo' | '15 min' | '20 min';
-  description?: string;
-  briefing?: {
-    context: string;
-    requirements: string[];
-    rubric: { criterion: string; weight: number }[];
-    estimatedTime: number;
-  };
-  steps?: {
-    id: string;
-    label: string;
-    type: 'check' | 'input' | 'select';
-    options?: string[];
-    correctValue?: string | number;
-    hint?: string;
-  }[];
-  evidence?: {
-    type: 'text' | 'image' | 'mixed';
-    minLength?: number;
-    placeholder?: string;
-  };
-  data?: any;
-};
-
-export default function NextEnterprisePlatform() {
-  const [view, setView] = useState<'login' | 'onboarding' | 'app'>('login');
-  const [activeTab, setActiveTab] = useState<'home' | 'myjobs' | 'wallet' | 'community' | 'profile' | 'support' | 'academy'>('home');
-  
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [balances, setBalances] = useState({ available: 0, analysis: 0, international: 0 });
-
-  // Session Persistence
-  useEffect(() => {
-    const savedProfile = localStorage.getItem('hopro_profile');
-    const savedBalances = localStorage.getItem('hopro_balances');
-    
-    if (savedProfile) {
-      try {
-        const parsed = JSON.parse(savedProfile);
-        setTimeout(() => {
-          setProfile(parsed);
-          setView('app');
-        }, 0);
-      } catch (e) {
-        console.error('Failed to load profile', e);
-      }
-    }
-    
-    if (savedBalances) {
-      try {
-        const parsed = JSON.parse(savedBalances);
-        setTimeout(() => setBalances(parsed), 0);
-      } catch (e) {
-        console.error('Failed to load balances', e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (profile) {
-      localStorage.setItem('hopro_profile', JSON.stringify(profile));
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    localStorage.setItem('hopro_balances', JSON.stringify(balances));
-  }, [balances]);
-  
-  const [activeMission, setActiveMission] = useState<Mission | null>(null);
-  const [showUpsell, setShowUpsell] = useState(false);
-  const [toastMessage, setToastMessage] = useState<{title: string, message: string} | null>(null);
-
-  // Applications State
-  const [applications, setApplications] = useState<{ 
-    mission: Mission, 
-    status: 'not_applied' | 'applied_waiting_unlock' | 'unlocked' | 'in_progress_day_n' | 'completed' | 'blocked', 
-    appliedAt?: number, 
-    unlockAt?: number,
-    unlockedNotified?: boolean
-  }[]>([]);
-
-  // Fake activity feed
-  useEffect(() => {
-    if (view !== 'app') return;
-    
-    const brazilianNames = [
-      "Marcos Vinícius", "Ana Beatriz", "Cláudia Souza", "Ricardo Lima",
-      "João Silva", "Maria Santos", "Pedro Costa", "Lucas Pereira", "Julia Rodrigues",
-      "Gabriel Almeida", "Laura Carvalho", "Mateus Gomes", "Beatriz Martins", "Rafael Araújo",
-      "Larissa Melo", "Thiago Ribeiro", "Camila Alves", "Bruno Barbosa", "Letícia Cardoso",
-      "Gustavo Rocha", "Amanda Dias", "Felipe Castro", "Fernanda Fernandes", "Diego Pinto",
-      "Carolina Moura", "Eduardo Cavalcanti", "Bruna Monteiro", "Leonardo Correia", "Juliana Lima",
-      "Rodrigo Teixeira", "Vanessa Mendes", "Marcelo Vieira", "Aline Borges", "Guilherme Farias",
-      "Patrícia Machado", "Henrique Barros", "Natália Moraes", "Caio Freitas", "Renata Nunes",
-      "Vinícius Pires", "Mariana Duarte", "Daniel Ramos", "Isabela Moraes", "Alexandre Cunha",
-      "Tatiana Viana", "Arthur Peixoto", "Priscila Rocha", "Vitor Nogueira", "Luana Batista",
-      "Fernando Marques", "Sabrina Neves", "Igor Sales", "Bianca Reis", "Roberto Campos",
-      "Thais Azevedo", "Leandro Aguiar", "Débora Moraes", "André Paiva", "Mônica Silveira",
-      "Victor Dantas", "Cíntia Pires", "Samuel Fogaça", "Talita Guedes", "Tiago Assis",
-      "Nayara Lemos", "Douglas Macedo", "Evelyn Viana", "Murilo Pacheco", "Gisele Franco",
-      "Renato Brito", "Lívia Bentes", "Fábio Meireles", "Suelen Gusmão", "Anderson Lira",
-      "Flávia Muniz", "Elias Sampaio", "Raquel Novaes", "Wesley Teles", "Paloma Barreto",
-      "Márcio Valente", "Tainá Cordeiro", "Alex Goulart", "Lorena Pimenta", "Willian Bicalho",
-      "Bárbara Leal", "Alan Furtado", "Milena Veloso", "Hugo Tavares", "Joana Diniz",
-      "Wellington Maia", "Kelly Brandão", "Breno Lovato", "Joyce Camargo", "César Fontes",
-      "Silvia Rangel", "Danilo Prado", "Mirian Lacerda", "Edson Xavier", "Teresa Pinho"
-    ];
-    
-    const interval = setInterval(() => {
-      const isJessica = Math.random() < 0.3; // 30% chance for Jessica
-      
-      let name, valueStr, status;
-      if (isJessica) {
-        name = "Jéssica O.";
-        valueStr = "1.152,40";
-        status = "Saque Aprovado (7º Dia)";
-      } else {
-        const fullName = brazilianNames[Math.floor(Math.random() * brazilianNames.length)];
-        const parts = fullName.split(' ');
-        name = `${parts[0]} ${parts[1][0]}.`;
-        const value = (Math.random() * (2800 - 1000) + 1000).toFixed(2);
-        valueStr = value.replace('.', ',');
-        const statuses = ["Saque Aprovado (7º Dia)", "Auditoria Concluída", "PIX Liberado"];
-        status = statuses[Math.floor(Math.random() * statuses.length)];
-      }
-
-      setToastMessage({
-        title: `${name} - ${status}`,
-        message: `R$ ${valueStr} transferido com sucesso.`
-      });
-      
-      setTimeout(() => setToastMessage(null), 5000);
-    }, Math.random() * (45000 - 20000) + 20000); // 20 to 45 seconds
-    
-    return () => clearInterval(interval);
-  }, [view]);
-
-  const handleLogin = () => {
-    setView('onboarding');
-  };
-
-  const handleOnboardingComplete = (data: any) => {
-    setProfile({
-      ...data,
-      pixKey: null,
-      level: 'Nacional Bronze',
-      tasksCompleted: 0,
-      tasksToday: 0,
-      lastTaskDate: new Date().toISOString().split('T')[0],
-      isVerified: false, // Becomes true after 1st task
-      isPremium: false,
-      isCommunityMember: false,
-      createdAt: Date.now(),
-      completedModules: [],
-      history: [],
-    });
-    setView('app');
-    
-    // Trigger first upsell after 3 seconds
-    setTimeout(() => {
-      setShowUpsell(true);
-    }, 3000);
-  };
-
-  const handleTaskComplete = (mission: Mission) => {
-    if (!profile) return;
-    
-    // Update balance
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (mission.currency === 'BRL') {
-      setBalances(prev => ({ ...prev, analysis: prev.analysis + mission.value }));
-    } else {
-      setBalances(prev => ({ ...prev, international: prev.international + mission.value }));
-    }
-    
-    // Update profile
-    const newTasksCount = profile.tasksCompleted + 1;
-    let newLevel = profile.level;
-    
-    if (newTasksCount >= 5 && profile.level === 'Nacional Bronze') newLevel = 'Nacional Prata';
-    if (newTasksCount >= 15 && profile.level === 'Nacional Prata') newLevel = 'Nacional Ouro';
-    
-    const newTasksToday = profile.lastTaskDate === today ? profile.tasksToday + 1 : 1;
-
-    setProfile(prev => {
-      if (!prev) return null;
-      
-      // Update history
-      const existingHistoryIndex = prev.history.findIndex(h => h.date === today);
-      const newHistory = [...prev.history];
-      
-      if (existingHistoryIndex >= 0) {
-        newHistory[existingHistoryIndex] = {
-          ...newHistory[existingHistoryIndex],
-          amount: newHistory[existingHistoryIndex].amount + (mission.currency === 'BRL' ? mission.value : 0)
-        };
-      } else {
-        newHistory.push({ date: today, amount: mission.currency === 'BRL' ? mission.value : 0 });
-      }
-
-      return {
-        ...prev,
-        tasksCompleted: newTasksCount,
-        tasksToday: newTasksToday,
-        lastTaskDate: today,
-        level: newLevel,
-        isVerified: true,
-        history: newHistory
-      };
-    });
-    
-    setActiveMission(null);
-  };
-
-  const handleUpgrade = () => {
-    setProfile(prev => prev ? { ...prev, isPremium: true, level: 'Global' } : null);
-    setShowUpsell(false);
-  };
-
-  const handleCompleteModule = (moduleId: string) => {
-    if (!profile) return;
-    
-    setProfile(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        completedModules: [...(prev.completedModules || []), moduleId]
-      };
-    });
-    
-    setToastMessage({
-      title: 'Módulo Concluído!',
-      message: 'Você desbloqueou novas tarefas de alto valor.'
-    });
-    
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  const handleApplyToJob = (mission: Mission) => {
-    // Prevent duplicate applications
-    if (applications.some(app => app.mission.id === mission.id)) {
-      setToastMessage({
-        title: 'Candidatura Já Enviada',
-        message: 'Você já se candidatou a esta vaga. Verifique em "Trabalhos".'
-      });
-      setTimeout(() => setToastMessage(null), 3000);
-      return;
-    }
-
-    const now = Date.now();
-    setApplications(prev => [...prev, {
-      mission,
-      status: 'applied_waiting_unlock',
-      appliedAt: now,
-      unlockAt: now + 24 * 60 * 60 * 1000, // 24h
-      unlockedNotified: false
-    }]);
-    
-    setToastMessage({
-      title: 'Candidatura confirmada',
-      message: 'Volte amanhã; liberação em 24h.'
-    });
-  };
-
-  if (view === 'login') return <LoginView onLogin={handleLogin} />;
-  if (view === 'onboarding') return <OnboardingView onComplete={handleOnboardingComplete} />;
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#0f172a_0%,_#020617_100%)] text-slate-100 font-sans selection:bg-blue-500/30">
-      {/* Top Challenge Bar */}
-      <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-2 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
-          <span className="text-xs font-bold text-blue-400 tracking-wider uppercase">Dia 1 de 7</span>
-        </div>
-        <span className="text-[10px] text-blue-400/80 font-medium">Complete para o Bônus de R$ 600</span>
+    <div className="min-h-screen bg-[#020617] text-white overflow-hidden">
+      {/* Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-blue-600/8 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/3 w-[600px] h-[600px] bg-purple-600/8 rounded-full blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/4 rounded-full blur-[150px]" />
       </div>
 
-      {/* Main Content Area */}
-      <main className="pb-24">
-        <AnimatePresence mode="wait">
-          {activeTab === 'home' && (
-            <motion.div key="home" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <DashboardView 
-                balances={balances} 
-                profile={profile!} 
-                onOpenTask={setActiveMission}
-                onApply={handleApplyToJob}
-              />
-            </motion.div>
-          )}
-          {activeTab === 'myjobs' && (
-            <motion.div key="myjobs" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <MyJobsView 
-                applications={applications}
-                onOpenTask={setActiveMission}
-              />
-            </motion.div>
-          )}
-          {activeTab === 'wallet' && (
-            <motion.div key="wallet" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <WalletView balances={balances} profile={profile!} />
-            </motion.div>
-          )}
-          {activeTab === 'community' && (
-            <motion.div key="community" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <CommunityView 
-                profile={profile!} 
-                onJoinCommunity={() => setProfile(prev => prev ? { ...prev, isCommunityMember: true } : null)}
-              />
-            </motion.div>
-          )}
-          {activeTab === 'profile' && (
-            <motion.div key="profile" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <ProfileView 
-                profile={profile!} 
-                onUpdateProfile={(updates) => setProfile(prev => prev ? { ...prev, ...updates } : null)}
-              />
-            </motion.div>
-          )}
-          {activeTab === 'support' && (
-            <motion.div key="support" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <SupportView />
-            </motion.div>
-          )}
-          {activeTab === 'academy' && (
-            <motion.div key="academy" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <AcademyView 
-                profile={profile!} 
-                onCompleteModule={handleCompleteModule}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+      {/* Grid pattern */}
+      <div
+        className="fixed inset-0 pointer-events-none opacity-20"
+        style={{
+          backgroundImage: `linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)`,
+          backgroundSize: '60px 60px',
+        }}
+      />
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 glass-panel border-t border-white/10 px-6 py-4 z-40 pb-safe">
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          {[
-            { id: 'home', icon: Home, label: 'Início' },
-            { id: 'myjobs', icon: Briefcase, label: 'Trabalhos' },
-            { id: 'wallet', icon: Wallet, label: 'Carteira' },
-            { id: 'academy', icon: BookOpen, label: 'Academia' },
-            { id: 'community', icon: Users, label: 'Comunidade' },
-            { id: 'profile', icon: UserIcon, label: 'Perfil' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex flex-col items-center gap-1 transition-colors ${
-                activeTab === tab.id ? 'text-blue-500' : 'text-slate-500 hover:text-slate-400'
-              }`}
+      {/* Nav */}
+      <nav className="relative z-10 border-b border-slate-800/50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <Zap className="w-4.5 h-4.5 text-white" />
+            </div>
+            <span className="text-xl font-bold">VSL Cloner</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="text-slate-400 hover:text-white text-sm font-medium transition px-3 py-2 rounded-lg hover:bg-slate-800"
             >
-              <tab.icon className={`w-6 h-6 ${activeTab === tab.id ? 'fill-blue-500/20' : ''}`} />
-              <span className="text-[10px] font-bold uppercase tracking-wider">{tab.label}</span>
-            </button>
-          ))}
+              Entrar
+            </Link>
+            <Link
+              href="/signup"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/20"
+            >
+              Começar grátis
+            </Link>
+          </div>
         </div>
       </nav>
 
-      {/* Modals & Overlays */}
-      <AnimatePresence>
-        {activeMission && (
-          <TaskSimulator 
-            mission={activeMission} 
-            onClose={() => setActiveMission(null)} 
-            onComplete={() => handleTaskComplete(activeMission)} 
-          />
-        )}
-        
-        {showUpsell && (
-          <UpsellModal 
-            onClose={() => setShowUpsell(false)} 
-            onUpgrade={handleUpgrade} 
-          />
-        )}
+      {/* Hero */}
+      <section className="relative z-10 pt-20 pb-16 px-4 text-center">
+        <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-1.5 text-sm text-blue-400 mb-8">
+          <Zap className="w-3.5 h-3.5" />
+          Clone funis VSL em segundos
+        </div>
 
-        {toastMessage && (
-          <ToastNotification 
-            title={toastMessage.title} 
-            message={toastMessage.message} 
-          />
-        )}
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight max-w-4xl mx-auto">
+          Clone qualquer funil{' '}
+          <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            VSL
+          </span>{' '}
+          e publique com seus links
+        </h1>
 
-        <PWAInstallPrompt />
-      </AnimatePresence>
+        <p className="text-lg sm:text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+          Cole a URL de qualquer página VSL. O sistema extrai automaticamente o player,
+          vídeos .m3u8, pixels de rastreamento, delay de CTA e links de checkout — tudo pronto
+          para você personalizar e publicar.
+        </p>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link
+            href="/signup"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-lg px-8 py-4 rounded-2xl transition-all duration-200 shadow-2xl shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-0.5"
+          >
+            Criar conta grátis
+            <ArrowRight className="w-5 h-5" />
+          </Link>
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 text-slate-300 hover:text-white font-medium text-lg px-6 py-4 rounded-2xl border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:bg-slate-800"
+          >
+            Já tenho conta
+          </Link>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="relative z-10 py-16 px-4">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">
+            Tudo que você precisa para clonar funis VSL
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                icon: <Video className="w-6 h-6 text-purple-400" />,
+                color: 'bg-purple-500/10 border-purple-500/20',
+                title: 'Extração de Players',
+                desc: 'Detecta e extrai automaticamente players ConvertAI, VTurb e SmartPlayer com todos os IDs e manifestos .m3u8.',
+              },
+              {
+                icon: <Tag className="w-6 h-6 text-blue-400" />,
+                color: 'bg-blue-500/10 border-blue-500/20',
+                title: 'Pixels e Rastreamento',
+                desc: 'Identifica Facebook Pixel, Google Analytics e UTMify. Troque pelo seu ID com um clique.',
+              },
+              {
+                icon: <Clock className="w-6 h-6 text-yellow-400" />,
+                color: 'bg-yellow-500/10 border-yellow-500/20',
+                title: 'Delay de CTA',
+                desc: 'Detecta configurações de delay (scrollToActionIn, ctaDelay) para replicar a mesma experiência do funil original.',
+              },
+              {
+                icon: <Globe className="w-6 h-6 text-green-400" />,
+                color: 'bg-green-500/10 border-green-500/20',
+                title: 'Publicação Instantânea',
+                desc: 'Gera uma URL pública para sua página clonada com seus links de checkout e pixels personalizados.',
+              },
+              {
+                icon: <Shield className="w-6 h-6 text-indigo-400" />,
+                color: 'bg-indigo-500/10 border-indigo-500/20',
+                title: 'Server-side Seguro',
+                desc: 'Todo processamento ocorre no servidor, evitando bloqueios CORS e garantindo extração confiável.',
+              },
+              {
+                icon: <CheckCircle className="w-6 h-6 text-emerald-400" />,
+                color: 'bg-emerald-500/10 border-emerald-500/20',
+                title: 'Editor Visual',
+                desc: 'Interface limpa para trocar checkout, pixel e textos. Preview do relatório de extração em tempo real.',
+              },
+            ].map(({ icon, color, title, desc }) => (
+              <div key={title} className={`glass-panel rounded-2xl p-6 border ${color}`}>
+                <div className={`w-12 h-12 rounded-xl ${color} border flex items-center justify-center mb-4`}>
+                  {icon}
+                </div>
+                <h3 className="font-semibold text-white mb-2">{title}</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Players supported */}
+      <section className="relative z-10 py-12 px-4 border-t border-slate-800/50">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-slate-500 text-sm mb-6 uppercase tracking-wider">Players suportados</p>
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            {['ConvertAI', 'VTurb', 'SmartPlayer'].map((player) => (
+              <div
+                key={player}
+                className="glass-panel px-6 py-3 rounded-xl text-slate-300 font-semibold text-sm"
+              >
+                {player}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA bottom */}
+      <section className="relative z-10 py-20 px-4 text-center">
+        <div className="max-w-2xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            Pronto para clonar seu primeiro funil?
+          </h2>
+          <p className="text-slate-400 mb-8">
+            Crie sua conta gratuitamente e comece a clonar funis VSL agora mesmo.
+          </p>
+          <Link
+            href="/signup"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-lg px-10 py-4 rounded-2xl transition-all duration-200 shadow-2xl shadow-blue-500/30 hover:-translate-y-0.5"
+          >
+            Começar agora — é grátis
+            <ArrowRight className="w-5 h-5" />
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-slate-800/50 py-8 px-4 text-center text-slate-500 text-sm">
+        <p>© {new Date().getFullYear()} VSL Cloner. Todos os direitos reservados.</p>
+      </footer>
     </div>
   );
 }
