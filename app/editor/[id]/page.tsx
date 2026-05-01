@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import type { Project, ExtractedData, Customizations, PlayerData, TrackingData, CtaData, CheckoutData } from '@/lib/supabase';
 import StatusBadge from '@/components/StatusBadge';
 import {
@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 
 export default function EditorPage() {
-  const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
 
@@ -48,7 +47,7 @@ export default function EditorPage() {
     setLoading(true);
     const res = await fetch(`/api/projects/${projectId}`);
     if (!res.ok) {
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
       return;
     }
     const data = await res.json();
@@ -179,7 +178,7 @@ export default function EditorPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => { window.location.href = '/dashboard'; }}
               className="text-slate-400 hover:text-white transition p-1.5 rounded-lg hover:bg-slate-800"
             >
               <ArrowLeft className="w-5 h-5" />

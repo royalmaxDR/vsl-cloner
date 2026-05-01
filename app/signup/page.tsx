@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader2, Zap } from 'lucide-react';
 
-function SignupForm() {
-  const router = useRouter();
+export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,8 +28,7 @@ function SignupForm() {
 
     setLoading(true);
 
-    // Sign up — with email confirmation disabled in Supabase, this creates
-    // a confirmed user immediately and returns a session
+    // Tenta criar a conta
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -47,27 +44,25 @@ function SignupForm() {
       return;
     }
 
-    // If signup returned a session directly (email confirmation disabled), use it
+    // Se o signup retornou sessão diretamente (confirmação desabilitada), redireciona
     if (signUpData.session) {
-      router.push('/dashboard');
-      router.refresh();
+      window.location.href = '/dashboard';
       return;
     }
 
-    // Fallback: try to sign in immediately (in case signup didn't return session)
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    // Fallback: tenta fazer login imediatamente
+    const { error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (signInError || !signInData.session) {
-      // Signup succeeded but can't auto-login — redirect to login page with message
-      router.push('/login?message=conta-criada');
+    if (!signInError) {
+      window.location.href = '/dashboard';
       return;
     }
 
-    router.push('/dashboard');
-    router.refresh();
+    // Se não conseguiu logar, vai para login com mensagem
+    window.location.href = '/login';
   }
 
   return (
@@ -163,19 +158,5 @@ function SignupForm() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function SignupPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#020617]">
-          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-        </div>
-      }
-    >
-      <SignupForm />
-    </Suspense>
   );
 }

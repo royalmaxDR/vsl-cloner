@@ -1,40 +1,23 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader2, Zap } from 'lucide-react';
 
-function LoginForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // If already logged in, redirect immediately without going through middleware
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        const redirectTo = searchParams.get('redirectTo');
-        const dest =
-          redirectTo && redirectTo.startsWith('/') && redirectTo !== '/login' && redirectTo !== '/signup'
-            ? redirectTo
-            : '/dashboard';
-        router.replace(dest);
-      }
-    });
-  }, [router, searchParams]);
-
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
+    const { error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -44,36 +27,27 @@ function LoginForm() {
       if (msg === 'Invalid login credentials') {
         msg = 'E-mail ou senha incorretos.';
       } else if (msg.toLowerCase().includes('email not confirmed')) {
-        msg = 'E-mail não confirmado. Verifique sua caixa de entrada ou crie uma nova conta.';
+        msg = 'E-mail não confirmado. Tente criar uma nova conta.';
       } else if (msg.toLowerCase().includes('too many requests')) {
-        msg = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+        msg = 'Muitas tentativas. Aguarde alguns minutos.';
       }
       setError(msg);
       setLoading(false);
       return;
     }
 
-    if (data.session) {
-      const redirectTo = searchParams.get('redirectTo');
-      const dest =
-        redirectTo && redirectTo.startsWith('/') && redirectTo !== '/login' && redirectTo !== '/signup'
-          ? redirectTo
-          : '/dashboard';
-      router.push(dest);
-      router.refresh();
-    }
+    // Hard redirect — evita qualquer problema com router.push e cookies
+    window.location.href = '/dashboard';
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#020617] px-4">
-      {/* Background blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
@@ -84,7 +58,6 @@ function LoginForm() {
           <p className="text-slate-400">Acesse sua conta</p>
         </div>
 
-        {/* Card */}
         <div className="glass-panel rounded-2xl p-8">
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
@@ -155,19 +128,5 @@ function LoginForm() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#020617]">
-          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-        </div>
-      }
-    >
-      <LoginForm />
-    </Suspense>
   );
 }

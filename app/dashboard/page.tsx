@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { Project } from '@/lib/supabase';
 import StatusBadge from '@/components/StatusBadge';
@@ -21,7 +20,6 @@ import {
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -38,19 +36,19 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.push('/login');
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        window.location.href = '/login';
         return;
       }
-      setUserEmail(data.user.email || '');
+      setUserEmail(session.user.email || '');
+      fetchProjects();
     });
-    fetchProjects();
-  }, [fetchProjects, router]);
+  }, [fetchProjects]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push('/login');
+    window.location.href = '/login';
   }
 
   async function handleDelete(id: string) {
@@ -64,7 +62,7 @@ export default function DashboardPage() {
   function handleProjectCreated(projectId: string) {
     setShowModal(false);
     fetchProjects();
-    router.push(`/editor/${projectId}`);
+    window.location.href = `/editor/${projectId}`;
   }
 
   const stats = {
