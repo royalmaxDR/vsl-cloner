@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
     ],
     unoptimized: true,
   },
+  // Exclude heavy native modules from bundling — they must be loaded at runtime
+  serverExternalPackages: [
+    '@sparticuz/chromium-min',
+    'puppeteer-core',
+  ],
   // Allow cross-origin requests for VSL player scripts
   async headers() {
     return [

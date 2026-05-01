@@ -478,7 +478,36 @@ function extractAssets(html: string): ExtractedAssets {
 // ─── Main extractor ───────────────────────────────────────────────────────────
 
 export async function extractVSL(url: string): Promise<ExtractionResult> {
-  const { html: rawHtml, finalUrl } = await fetchPage(url);
+  let rawHtml: string;
+  let finalUrl: string;
+
+  try {
+    const result = await fetchPage(url);
+    rawHtml = result.html;
+    finalUrl = result.finalUrl;
+  } catch (fetchError) {
+    const message = fetchError instanceof Error ? fetchError.message : '';
+    // If blocked by anti-bot (403/Cloudflare), fall back to headless browser
+    if (message.includes('HTTP 403') || message.includes('bloqueia')) {
+      console.log('[extractor] Fetch bloqueado (403), tentando headless browser...');
+      try {
+        const { fetchPageWithBrowser } = await import('./browser-extractor');
+        const browserResult = await fetchPageWithBrowser(url);
+        rawHtml = browserResult.html;
+        finalUrl = browserResult.finalUrl;
+      } catch (browserError) {
+        const browserMessage = browserError instanceof Error ? browserError.message : 'Erro no browser';
+        // If browser also fails, throw original error with both messages
+        throw new Error(
+          `HTTP 403: Este site tem proteção anti-bot avançada (Cloudflare). ` +
+          `Detalhe: ${browserMessage}. ` +
+          `Tente usar a URL sem parâmetros de rastreamento ou entre em contato com o suporte.`
+        );
+      }
+    } else {
+      throw fetchError;
+    }
+  }
 
   const player = detectPlayer(rawHtml);
   const m3u8Urls = extractM3u8Urls(rawHtml);
