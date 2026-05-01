@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseRouteClient } from '@/lib/supabase-server';
 import type { ExtractedData, Customizations } from '@/lib/supabase';
 
 function generateSlug(name: string): string {
@@ -40,11 +40,12 @@ function applyCustomizations(
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const supabase = createSupabaseRouteClient(request);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
+    const user = session.user;
 
     const body = await request.json();
     const { projectId } = body;

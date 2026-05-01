@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractVSL } from '@/lib/extractor';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseRouteClient } from '@/lib/supabase-server';
 
 export const maxDuration = 30; // Vercel function timeout
 
 export async function POST(request: NextRequest) {
   try {
     // Auth check
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const supabase = createSupabaseRouteClient(request);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
+    const user = session.user;
 
     const body = await request.json();
     const { url, projectId } = body;

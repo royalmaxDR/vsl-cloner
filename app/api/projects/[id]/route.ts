@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseRouteClient } from '@/lib/supabase-server';
 
 // GET /api/projects/[id] — get single project
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const supabase = createSupabaseRouteClient(request);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
@@ -18,7 +18,7 @@ export async function GET(
       .from('projects')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('user_id', session.user.id)
       .single();
 
     if (error || !data) {
@@ -39,9 +39,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const supabase = createSupabaseRouteClient(request);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
@@ -57,7 +57,7 @@ export async function PUT(
       .from('projects')
       .update(updateData)
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('user_id', session.user.id)
       .select()
       .single();
 
@@ -74,14 +74,14 @@ export async function PUT(
 
 // DELETE /api/projects/[id]
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const supabase = createSupabaseRouteClient(request);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
@@ -89,7 +89,7 @@ export async function DELETE(
       .from('projects')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id);
+      .eq('user_id', session.user.id);
 
     if (error) throw error;
 
