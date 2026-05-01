@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseRouteClient } from '@/lib/supabase-server';
+import { authenticateRequest, createSupabaseAdminClient } from '@/lib/supabase-server';
 import type { ExtractedData, Customizations } from '@/lib/supabase';
 
 function generateSlug(name: string): string {
@@ -19,18 +19,15 @@ function applyCustomizations(
 ): ExtractedData {
   const result = JSON.parse(JSON.stringify(extractedData)) as ExtractedData;
 
-  // Replace checkout URL
   if (customizations.checkoutUrl && result.checkout) {
     result.checkout.primaryLink = customizations.checkoutUrl;
     result.checkout.links = [customizations.checkoutUrl, ...result.checkout.links.slice(1)];
   }
 
-  // Replace Facebook Pixel ID
   if (customizations.facebookPixelId && result.tracking) {
     result.tracking.facebookPixelId = customizations.facebookPixelId;
   }
 
-  // Replace page texts
   if (customizations.headlineText && result.page) {
     result.page.title = customizations.headlineText;
   }
@@ -40,12 +37,10 @@ function applyCustomizations(
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseRouteClient(request);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const user = await authenticateRequest(request);
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
-    const user = session.user;
 
     const body = await request.json();
     const { projectId } = body;
@@ -54,7 +49,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'projectId é obrigatório' }, { status: 400 });
     }
 
-    // Fetch project
+    const supabase = createSupabaseAdminClient();
+
     const { data: project, error: fetchError } = await supabase
       .from('projects')
       .select('*')
@@ -73,11 +69,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate unique slug
     const baseSlug = generateSlug(project.name);
     const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
 
-    // Apply customizations to extracted data
     const finalData = project.customizations
       ? applyCustomizations(
           project.extracted_data as ExtractedData,
@@ -85,13 +79,12 @@ export async function POST(request: NextRequest) {
         )
       : project.extracted_data;
 
-    // Build published URL (relative path on this deployment)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ||
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
       request.headers.get('origin') ||
-      'https://vsl-cloner.vercel.app';
+      'https://cloneia-swart.vercel.app';
     const publishedUrl = `${appUrl}/p/${uniqueSlug}`;
 
-    // Update project
     const { data: updated, error: updateError } = await supabase
       .from('projects')
       .update({

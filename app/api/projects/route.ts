@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseRouteClient } from '@/lib/supabase-server';
+import { authenticateRequest, createSupabaseAdminClient } from '@/lib/supabase-server';
 
 // GET /api/projects — list user's projects
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createSupabaseRouteClient(request);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const user = await authenticateRequest(request);
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
+    const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
       .from('projects')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -28,9 +28,8 @@ export async function GET(request: NextRequest) {
 // POST /api/projects — create new project
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseRouteClient(request);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const user = await authenticateRequest(request);
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
@@ -44,10 +43,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
       .from('projects')
       .insert({
-        user_id: session.user.id,
+        user_id: user.id,
         name: name.trim(),
         source_url: source_url.trim(),
         status: 'extraindo',

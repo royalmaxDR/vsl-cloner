@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { authFetch } from '@/lib/auth-fetch';
 import type { Project } from '@/lib/supabase';
 import StatusBadge from '@/components/StatusBadge';
 import NewProjectModal from '@/components/NewProjectModal';
@@ -27,7 +28,7 @@ export default function DashboardPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchProjects = useCallback(async () => {
-    const res = await fetch('/api/projects');
+    const res = await authFetch('/api/projects');
     if (res.ok) {
       const data = await res.json();
       setProjects(data.projects || []);
@@ -54,7 +55,7 @@ export default function DashboardPage() {
   async function handleDelete(id: string) {
     if (!confirm('Tem certeza que deseja excluir este projeto?')) return;
     setDeletingId(id);
-    await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+    await authFetch(`/api/projects/${id}`, { method: 'DELETE' });
     setProjects((prev) => prev.filter((p) => p.id !== id));
     setDeletingId(null);
   }

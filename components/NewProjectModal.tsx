@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2, Link as LinkIcon, FolderPlus } from 'lucide-react';
+import { authFetch } from '@/lib/auth-fetch';
 
 interface Props {
   onClose: () => void;
@@ -21,9 +22,8 @@ export default function NewProjectModal({ onClose, onCreated }: Props) {
 
     try {
       // 1. Create project
-      const createRes = await fetch('/api/projects', {
+      const createRes = await authFetch('/api/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), source_url: url.trim() }),
       });
       const createData = await createRes.json();
@@ -32,9 +32,8 @@ export default function NewProjectModal({ onClose, onCreated }: Props) {
       const projectId = createData.project.id;
 
       // 2. Trigger extraction
-      const extractRes = await fetch('/api/extract', {
+      const extractRes = await authFetch('/api/extract', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url.trim(), projectId }),
       });
       const extractData = await extractRes.json();

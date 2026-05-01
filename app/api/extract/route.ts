@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractVSL } from '@/lib/extractor';
-import { createSupabaseRouteClient } from '@/lib/supabase-server';
+import { authenticateRequest, createSupabaseAdminClient } from '@/lib/supabase-server';
 
-export const maxDuration = 30; // Vercel function timeout
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth check
-    const supabase = createSupabaseRouteClient(request);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const user = await authenticateRequest(request);
+    if (!user) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
-    const user = session.user;
 
     const body = await request.json();
     const { url, projectId } = body;
@@ -21,7 +18,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'URL inválida' }, { status: 400 });
     }
 
-    // Validate URL format
     let normalizedUrl = url.trim();
     if (!normalizedUrl.startsWith('http')) {
       normalizedUrl = `https://${normalizedUrl}`;
@@ -33,26 +29,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'URL inválida. Verifique o formato.' }, { status: 400 });
     }
 
-    // Run extraction
     const result = await extractVSL(normalizedUrl);
 
-    // If projectId provided, update project and save extraction record
     if (projectId) {
-      // Update project status to 'pronto' with extracted data
+      const supabase = createSupabaseAdminClient();
+
       await supabase
         .from('projects')
         .update({
           status: 'pronto',
           extracted_data: result.data,
-          updated_at: new Date().toISOString(),
         })
         .eq('id', projectId)
         .eq('user_id', user.id);
 
-      // Save extraction record (without raw HTML to keep response lean)
       await supabase.from('extractions').insert({
         project_id: projectId,
-        raw_html: result.rawHtml.substring(0, 500000), // limit to 500KB
+        raw_html: result.rawHtml.substring(0, 500000),
         assets: result.assets,
         metadata: result.metadata,
       });

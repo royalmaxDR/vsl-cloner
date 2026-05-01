@@ -1,56 +1,54 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import type { NextRequest } from 'next/server';
 
 /**
- * Para uso em Server Components (sem request disponível).
- * Lê cookies do cookie store do Next.js.
+ * Extrai o token Bearer do header Authorization da request.
+ * Retorna null se não houver header ou token inválido.
  */
-export async function createSupabaseServerClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Server Component — cookies can't be set from here
-          }
-        },
-      },
-    }
-  );
+export function extractBearerToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.replace('Bearer ', '').trim();
+  return token || null;
 }
 
 /**
- * Para uso em Route Handlers (API routes).
- * Lê cookies diretamente da NextRequest — garante que os cookies
- * de sessão do Supabase (sb-*-auth-token) sejam lidos corretamente
- * mesmo sem middleware para refresh do token.
+ * Cria um client Supabase com service_role_key (acesso total, server-side only).
+ * Use apenas em API routes — NUNCA exponha no client-side.
  */
-export function createSupabaseRouteClient(request: NextRequest) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll() {
-          // Route handlers não precisam persistir cookies de volta
-          // O cliente browser gerencia o refresh automaticamente
-        },
-      },
-    }
-  );
+export function createSupabaseAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceKey) {
+    throw new Error('Supabase URL ou SUPABASE_SERVICE_ROLE_KEY não configurados');
+  }
+
+  return createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+/**
+ * Verifica um JWT de usuário usando o admin client.
+ * Retorna o user autenticado ou null se inválido.
+ */
+export async function verifyUserToken(token: string) {
+  const admin = createSupabaseAdminClient();
+  const { data: { user }, error } = await admin.auth.getUser(token);
+  if (error || !user) return null;
+  return user;
+}
+
+/**
+ * Helper completo: extrai token da request, verifica e retorna o user.
+ * Retorna null se não autenticado.
+ */
+export async function authenticateRequest(request: NextRequest) {
+  const token = extractBearerToken(request);
+  if (!token) return null;
+  return verifyUserToken(token);
 }

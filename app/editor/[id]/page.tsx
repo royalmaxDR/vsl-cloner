@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { authFetch } from '@/lib/auth-fetch';
 import type { Project, ExtractedData, Customizations, PlayerData, TrackingData, CtaData, CheckoutData } from '@/lib/supabase';
 import StatusBadge from '@/components/StatusBadge';
 import {
@@ -45,7 +46,7 @@ export default function EditorPage() {
 
   const loadProject = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/projects/${projectId}`);
+    const res = await authFetch(`/api/projects/${projectId}`);
     if (!res.ok) {
       window.location.href = '/dashboard';
       return;
@@ -65,7 +66,7 @@ export default function EditorPage() {
     setCtaButtonText(custom?.ctaButtonText || extracted?.cta?.buttons?.[0]?.text || '');
     setPublishedUrl(p.published_url);
     setLoading(false);
-  }, [projectId, router]);
+  }, [projectId]);
 
   useEffect(() => {
     loadProject();
@@ -83,9 +84,8 @@ export default function EditorPage() {
       ctaButtonColor: null,
     };
 
-    const res = await fetch(`/api/projects/${projectId}`, {
+    const res = await authFetch(`/api/projects/${projectId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customizations }),
     });
 
@@ -104,9 +104,8 @@ export default function EditorPage() {
     setPublishing(true);
     setError(null);
 
-    const res = await fetch('/api/publish', {
+    const res = await authFetch('/api/publish', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId }),
     });
 
@@ -125,9 +124,8 @@ export default function EditorPage() {
     setReExtracting(true);
     setError(null);
 
-    const res = await fetch('/api/extract', {
+    const res = await authFetch('/api/extract', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: project.source_url, projectId }),
     });
 
