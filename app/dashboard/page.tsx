@@ -123,6 +123,14 @@ export default function DashboardPage() {
               <RefreshCw className="w-4 h-4" />
             </button>
             <button
+              onClick={() => router.push('/local-clone')}
+              className="flex items-center gap-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 font-semibold px-4 py-2.5 rounded-xl transition"
+              title="Motor local (Puppeteer) — para funis complexos com Cloudflare"
+            >
+              <Zap className="w-4 h-4" />
+              Motor Local
+            </button>
+            <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold px-4 py-2.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/20"
             >

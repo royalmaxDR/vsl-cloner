@@ -49,6 +49,19 @@ export async function createSupabaseServerClient() {
  * Use em qualquer route handler como primeira linha de defesa.
  */
 export async function getCurrentUser() {
+  // Modo dev local: pula autenticação quando LOCAL_CLONE_NO_AUTH=1.
+  // Útil para rodar `next dev` sem Supabase configurado, expondo o motor
+  // local sem precisar criar usuário. NUNCA defina essa env em produção.
+  if (process.env.LOCAL_CLONE_NO_AUTH === '1') {
+    return {
+      id: 'local-dev-user',
+      email: 'local@dev',
+      app_metadata: {},
+      user_metadata: {},
+      aud: 'authenticated',
+      created_at: new Date().toISOString(),
+    } as unknown as Awaited<ReturnType<typeof verifyUserToken>>;
+  }
   try {
     const supabase = await createSupabaseServerClient();
     const {

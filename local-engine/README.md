@@ -102,6 +102,36 @@ O servidor embutido usa **fallback SPA**: qualquer rota desconhecida cai para `i
 | Scripts de analytics (GTM, GA, Facebook Pixel, Utmify) tentam fazer requests externos e poluem o clone | Removidos do HTML e substituídos por stubs `fbq`/`gtag` no-op. |
 | Nomes ofuscados via SHA-256 (em outros funis) | O wrapper de `fetch` mantém o request original; ofuscação é resolvida pelo browser via `crypto.subtle` exatamente como em produção. |
 
+## Integração com o dashboard Next.js
+
+O motor pode ser usado diretamente pela interface web do projeto (em `app/local-clone`). O backend expõe quatro rotas:
+
+| Rota | Método | O que faz |
+|---|---|---|
+| `/api/local-clone/start` | POST | Cria um job, retorna `jobId` e URLs de stream/preview/download |
+| `/api/local-clone/stream/[jobId]` | GET (SSE) | Empurra eventos de progresso (`log`, `phase`, `asset`, `group`, `done`, `error`) em tempo real |
+| `/api/local-clone/preview/[jobId]/[...path]` | GET | Servidor estático do clone com fallback SPA — use direto em iframe |
+| `/api/local-clone/download/[jobId]` | GET | Devolve o `clone.zip` |
+| `/api/local-clone/jobs` | GET | Lista os jobs em memória (status, totais, erros) |
+
+Fluxo do usuário em `localhost:3000`:
+
+1. Faz login → abre `/local-clone` (ou clica em **Motor Local** no dashboard).
+2. Cola a URL do funil → clica em **Clonar**.
+3. Vê barra de progresso, contadores e log do motor empurrados via SSE.
+4. Ao terminar: iframe com o clone funcional + botão **Baixar ZIP**.
+
+### Variaveis de ambiente úteis (somente dev local)
+
+| Variável | Efeito |
+|---|---|
+| `LOCAL_CLONE_NO_AUTH=1` | Pula a autenticação nas rotas API. Use só em `next dev`, nunca em produção. |
+| `NEXT_PUBLIC_LOCAL_CLONE_NO_AUTH=1` | Pula o gate de login na página `/local-clone`. Idem. |
+
+### Por que não funciona na Vercel?
+
+A rota usa Puppeteer (Chrome real, ~170 MB) e dura 1–5 minutos por clone. Vercel e similares têm timeout de 60s por request e não suportam binaríos nativos do Chromium. O motor existe justamente para resolver isso: roda no PC do usuário sem limite, e o resultado pode ser hospedado em qualquer lugar.
+
 ## Subir para o painel SaaS (Supabase)
 
 Compatível com o motor anterior — o pacote `clone.zip` segue o mesmo formato.

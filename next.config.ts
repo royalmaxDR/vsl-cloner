@@ -18,6 +18,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     '@sparticuz/chromium-min',
     'puppeteer-core',
+    'puppeteer',
+    'ws',
+    'bufferutil',
+    'utf-8-validate',
+    'jszip',
   ],
   // Allow cross-origin requests for VSL player scripts
   async headers() {
